@@ -11,3 +11,6 @@ so that I can have my transactions automatically categorized and visualized on t
 - **AC2:** Given that I have selected a valid bank statement file, 
   When I submit the upload form, 
   Then my transactions should be processed and categorized correctly.
+- **AC3:** Given that my transactions have been processed, 
+  When I view the dashboard, 
+  Then I should see visualizations of my spending trends and categorized transactions.
