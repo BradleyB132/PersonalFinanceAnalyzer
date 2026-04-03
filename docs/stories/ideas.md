@@ -27,11 +27,11 @@ The user should be able to customize the dashboard by selecting which visualizat
 - Have the same widgets with different filter options
   to allow users to analyze their spending patterns in more detail.
 
-### transaction search and filtering
+### transaction search and filtering - IMPLEMENTED
 Allow users to search and filter their transactions based on various criteria (e.g., date range, category, amount).
 This will enable users to quickly find specific transactions and analyze their spending patterns more effectively.
 
-### Downloadable reports
+### Downloadable reports - 
 Allow users to download reports of their overall statements in various formats (e.g., PDF, CSV).
 This will enable users to have offline access to their financial data and share it with others if needed.
 With the ability to download a snapshot of the dashboard as a PDF, users can easily save and share their 
