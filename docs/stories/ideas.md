@@ -9,17 +9,17 @@ We need a user story for uploading bank statements,
 which will allow users to upload their transaction data and have it automatically categorized and 
 visualized on the dashboard(home screen).
 
-### Upload credit card statements
+### Upload credit card statements - IMPLEMENTED
 Allow users to upload their credit card statements in addition to bank statements.
 This will provide users with a more comprehensive view of their financial transactions 
 and help them better understand their spending habits.
 
-### Overriding categories
+### Overriding categories - IMPLEMENTED
 Allow users to manually override the automatically categorized transactions.
 This will give users more control over how their transactions are categorized 
 and allow them to correct any misclassifications.
 
-### Dashboard functionality
+### Dashboard functionality - IMPLEMENTED
 The dashboard should provide users with visualizations of their spending trends via graphs and charts
 The user should be able to customize the dashboard by selecting which visualizations they want to see via widgets
 - Deeper customization options could include allowing users to choose the time frame for the visualizations 
