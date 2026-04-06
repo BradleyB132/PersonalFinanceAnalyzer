@@ -1,0 +1,2 @@
+-- create a schema.sql file to include your DDL (CREATE TABLE SQL statements).
+-- The DDL shall match your logical ERD.
