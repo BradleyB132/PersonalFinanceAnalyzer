@@ -45,7 +45,6 @@ Key constraints and considerations:
   * Auth Module
   * File Upload & Processing Module
   * Transaction Management Module
-  * Categorization Engine
   * Dashboard & Reporting Module
   * Budgeting Module
 
