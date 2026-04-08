@@ -1,0 +1,21 @@
+[project]
+name = "personalfinanceanalyzer"
+version = "0.1.0"
+description = ""
+authors = [
+    {name = "Bradley Brenning",email = "Brenbra132@gmail.com"}
+]
+readme = "README.md"
+requires-python = ">=3.12"
+dependencies = [
+    "streamlit (>=1.56.0,<2.0.0)",
+    "sqlalchemy (>=2.0.49,<3.0.0)",
+    "psycopg2-binary (>=2.9.11,<3.0.0)",
+    "python-dotenv (>=1.2.2,<2.0.0)",
+    "pandas (>=3.0.2,<4.0.0)"
+]
+
+
+[build-system]
+requires = ["poetry-core>=2.0.0,<3.0.0"]
+build-backend = "poetry.core.masonry.api"
