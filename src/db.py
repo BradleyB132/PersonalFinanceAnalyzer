@@ -1,42 +1,50 @@
-"""
-Database helper module.
+"""Database helper module for the Streamlit application."""
 
-Provides a simple SQLAlchemy engine factory and helper functions for
-common DB operations used by the Streamlit app.
-
-All functions ensure database connections are closed using context managers.
-
-Complexities:
-- Connection creation: O(1)
-- execute_query: O(R) where R is rows returned
-
-"""
-
+from functools import lru_cache
 import os
-from sqlalchemy import create_engine, text
+
 from dotenv import load_dotenv
+from sqlalchemy import create_engine, text
 
 load_dotenv()
 
-DATABASE_URL = os.getenv('DATABASE_URL')
-if not DATABASE_URL:
-    raise RuntimeError('DATABASE_URL missing in environment')
 
-engine = create_engine(DATABASE_URL)
+def get_database_url() -> str:
+    database_url = os.getenv("DATABASE_URL")
+    if not database_url:
+        raise RuntimeError("DATABASE_URL missing in environment")
+    return database_url
 
 
-def execute_query(query, params=None):
-    """Execute a raw SQL query and return fetched rows as list of dicts.
+@lru_cache(maxsize=1)
+def get_engine():
+    return create_engine(get_database_url(), future=True)
 
-    Args:
-        query (str): SQL query text
-        params (dict): optional parameters
 
-    Returns:
-        list[dict]
-    """
-    with engine.connect() as conn:
-        res = conn.execute(text(query), params or {})
-        cols = res.keys()
-        rows = [dict(zip(cols, r)) for r in res.fetchall()]
-    return rows
+def execute_query(query, params=None, engine=None):
+    """Execute a raw SQL query and return rows as dictionaries."""
+
+    active_engine = engine or get_engine()
+    with active_engine.connect() as conn:
+        result = conn.execute(text(query), params or {})
+        rows = result.mappings().all()
+    return [dict(row) for row in rows]
+
+
+def fetch_one(query, params=None, engine=None):
+    """Execute a query and return the first row as a dictionary or None."""
+
+    active_engine = engine or get_engine()
+    with active_engine.connect() as conn:
+        result = conn.execute(text(query), params or {})
+        row = result.mappings().first()
+    return dict(row) if row else None
+
+
+def execute_write(query, params=None, engine=None):
+    """Execute a data-changing query and commit it."""
+
+    active_engine = engine or get_engine()
+    with active_engine.begin() as conn:
+        result = conn.execute(text(query), params or {})
+    return result
