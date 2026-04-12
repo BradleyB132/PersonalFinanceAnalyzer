@@ -1,68 +1,95 @@
-﻿# PersonalFinanceAnalyzer
-A web application that allows users to upload bank transactions and automatically categorize spending, visualize trends, and generate budgeting
+# PersonalFinanceAnalyzer
 
-# Logical Data Design
+PersonalFinanceAnalyzer is a Streamlit web application for personal finance tracking. The current implementation on the `login` branch provides a working registration and login flow backed by the existing `users` table in `db/schema.sql`.
 
-```mermaid
-erDiagram
-    USER {
-        int id PK
-        string email
-        string password_hash
-        datetime created_at
-    }
+## Project Description
 
-    CATEGORY {
-        int id PK
-        string name
-        int user_id FK "nullable for system categories"
-    }
+The application is being built incrementally around the documented user stories and acceptance criteria. Current auth functionality includes:
+- user registration
+- login with email and password
+- duplicate-email rejection
+- logout and return to the homepage/dashboard entry state
+- confirmation email delivery hook via SMTP configuration
 
-    TRANSACTION {
-        int id PK
-        int user_id FK
-        int category_id FK
-        decimal amount
-        string description
-        date transaction_date
-        int uploaded_file_id FK
-    }
+Architecture and stack decisions are documented in:
+- [docs/adr.md](docs/adr.md)
+- [docs/techstack.md](docs/techstack.md)
 
-    DESCRIPTION_RULE {
-        int id PK
-        string keyword
-        int category_id FK
-        int user_id FK "nullable for global rules"
-    }
+## How To Build
 
-    UPLOADED_FILE {
-        int id PK
-        int user_id FK
-        string file_type
-        string file_name
-        datetime uploaded_at
-    }
+Install dependencies with Poetry:
 
-    USER ||--o{ TRANSACTION : owns
-    USER ||--o{ CATEGORY : creates
-    USER ||--o{ UPLOADED_FILE : uploads
-    USER ||--o{ DESCRIPTION_RULE : defines
-
-    CATEGORY ||--o{ TRANSACTION : categorizes
-    CATEGORY ||--o{ DESCRIPTION_RULE : maps_to
-
-    DESCRIPTION_RULE ||--o{ TRANSACTION : auto_assigns
-
-    UPLOADED_FILE ||--o{ TRANSACTION : generates
+```bash
+poetry install
 ```
 
-## Notes
+If you need to refresh the database environment, start the included Postgres service:
 
-* **Categories** can be either system-defined (user_id = null) or user-defined
-* **Description rules** map keywords (e.g., "Walmart", "Uber") to categories
-* When a transaction is processed:
+```bash
+docker compose up -d db-dev
+```
 
-  * The system checks description rules
-  * If a match is found → category is auto-assigned
-  * If no match → fallback to a default category (e.g., "Uncategorized")
-* Users can override categories, and optionally create new rules from their changes
+## How To Run
+
+Start the Streamlit app:
+
+```bash
+poetry run streamlit run src/app.py
+```
+
+The app will open a login/register page. Use the register tab to create a new account and the login tab to sign in.
+
+## How To Run Tests
+
+Run the test suite:
+
+```bash
+poetry run pytest
+```
+
+Run formatting and lint checks:
+
+```bash
+poetry run ruff format --check .
+poetry run ruff check .
+```
+
+## Usage Examples
+
+Registration flow:
+1. Open the app.
+2. Go to the Register tab.
+3. Enter an email and password.
+4. Submit the form.
+5. If SMTP is configured, a confirmation email is sent. Otherwise, the app logs a preview and shows a warning.
+
+Login flow:
+1. Open the app.
+2. Go to the Login tab.
+3. Enter the registered email and password.
+4. Submit the form.
+5. On success, you are redirected to the dashboard view.
+
+Example confirmation message:
+
+```text
+Welcome to PersonalFinanceAnalyzer, user@example.com! Your account has been created successfully. You can now log in and access your dashboard.
+```
+
+## Requirement Coverage
+
+Implemented in this branch:
+- user stories and acceptance criteria for authentication
+- architecture decision record and tech stack record
+- unit, integration, and end-to-end style tests for auth logic
+- logging setup
+- GitHub CI, Dependabot, and code security scanning workflow files
+- PostgreSQL schema in `db/schema.sql`
+- login, registration, and logout behavior in the Streamlit app
+
+Still requires manual GitHub/environment setup:
+- main branch protection rules
+- required PR reviews and code review policy
+- GitHub Project backlog/sprint board
+- production deployment target and uptime monitoring
+- confirmation email SMTP configuration
