@@ -8,6 +8,7 @@ import streamlit as st
 
 from services.auth_service import authenticate_user, register_user
 from services.notifications import send_confirmation_email
+from ui.dashboard_page import render_dashboard_page
 
 logger = logging.getLogger(__name__)
 
@@ -130,28 +131,12 @@ def handle_logout() -> None:
     st.rerun()
 
 
-def render_logged_in_view() -> None:
+def render_logged_in_view(engine) -> None:
     user = st.session_state.authenticated_user
     if user is None:
         return
 
-    with st.sidebar:
-        st.subheader("Account")
-        st.write(user["email"])
-        if st.button("Logout", use_container_width=True, type="primary"):
-            handle_logout()
-
-    st.success("Logged in and redirected to your dashboard.")
-    st.title("Personal Finance Dashboard")
-    st.write("You are signed in and can now access personalized features.")
-    col1, col2 = st.columns(2)
-    with col1:
-        st.metric("Account status", "Active")
-    with col2:
-        st.metric("Email", user["email"])
-    st.info(
-        "Next implementation slices will connect uploads, categorization, and dashboards to this session."
-    )
+    render_dashboard_page(engine, handle_logout)
 
 
 def render_login_form(engine) -> None:
@@ -247,7 +232,7 @@ def render_auth_page(engine) -> None:
     inject_styles()
 
     if st.session_state.authenticated_user is not None:
-        render_logged_in_view()
+        render_logged_in_view(engine)
         return
 
     left_spacer, auth_col, right_spacer = st.columns([1.15, 1.45, 1.15])
