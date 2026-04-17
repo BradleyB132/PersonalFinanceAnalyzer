@@ -297,7 +297,10 @@ def render_login_form(engine) -> None:
             "Sign in", use_container_width=True, type="primary"
         )
 
-    st.markdown('<div class="auth-footer-line">Don\'t have an account?</div>', unsafe_allow_html=True)
+    st.markdown(
+        '<div class="auth-footer-line">Don\'t have an account?</div>',
+        unsafe_allow_html=True,
+    )
     st.button(
         "Register now",
         key="register_here_button",
@@ -330,7 +333,10 @@ def render_register_form(engine) -> None:
             "Create account", use_container_width=True, type="primary"
         )
 
-    st.markdown('<div class="auth-footer-line">Already have an account?</div>', unsafe_allow_html=True)
+    st.markdown(
+        '<div class="auth-footer-line">Already have an account?</div>',
+        unsafe_allow_html=True,
+    )
     st.button(
         "Login here",
         key="login_here_button",

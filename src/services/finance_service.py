@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from datetime import date, datetime
+from datetime import date
 from io import BytesIO
 import math
 from typing import Any
@@ -56,8 +56,14 @@ class StatementImportResult:
 
 def _normalize_columns(frame: pd.DataFrame) -> pd.DataFrame:
     renamed = frame.copy()
-    renamed.columns = [str(column).strip().lower().replace("-", " ") for column in renamed.columns]
-    renamed = renamed.rename(columns={column: COLUMN_ALIASES.get(column, column) for column in renamed.columns})
+    renamed.columns = [
+        str(column).strip().lower().replace("-", " ") for column in renamed.columns
+    ]
+    renamed = renamed.rename(
+        columns={
+            column: COLUMN_ALIASES.get(column, column) for column in renamed.columns
+        }
+    )
     return renamed
 
 
@@ -292,7 +298,9 @@ def get_transactions(engine, user_id: int) -> pd.DataFrame:
     return pd.DataFrame(rows)
 
 
-def get_transaction_by_id(engine, user_id: int, transaction_id: int) -> dict[str, Any] | None:
+def get_transaction_by_id(
+    engine, user_id: int, transaction_id: int
+) -> dict[str, Any] | None:
     return fetch_one(
         """
         SELECT id, user_id, amount, description, transaction_date, category_id, uploaded_file_id
@@ -304,14 +312,20 @@ def get_transaction_by_id(engine, user_id: int, transaction_id: int) -> dict[str
     )
 
 
-def update_transaction_category(engine, user_id: int, transaction_id: int, category_id: int) -> bool:
+def update_transaction_category(
+    engine, user_id: int, transaction_id: int, category_id: int
+) -> bool:
     result = execute_write(
         """
         UPDATE transactions
         SET category_id = :category_id
         WHERE user_id = :user_id AND id = :transaction_id
         """,
-        {"user_id": user_id, "transaction_id": transaction_id, "category_id": category_id},
+        {
+            "user_id": user_id,
+            "transaction_id": transaction_id,
+            "category_id": category_id,
+        },
         engine=engine,
     )
     return result.rowcount > 0
@@ -364,7 +378,7 @@ def search_transactions(
         FROM transactions t
         JOIN categories c ON c.id = t.category_id
         LEFT JOIN uploaded_files uf ON uf.id = t.uploaded_file_id
-        WHERE {' AND '.join(where_clauses)}
+        WHERE {" AND ".join(where_clauses)}
         ORDER BY t.transaction_date DESC, t.id DESC
         """,
         params,
@@ -414,12 +428,16 @@ def get_trend_summary(engine, user_id: int) -> pd.DataFrame:
 def get_dashboard_metrics(engine, user_id: int) -> dict[str, Any]:
     transactions = get_transactions(engine, user_id)
     categories = get_category_summary(engine, user_id)
-    total_amount = float(transactions["amount"].sum()) if not transactions.empty else 0.0
+    total_amount = (
+        float(transactions["amount"].sum()) if not transactions.empty else 0.0
+    )
     return {
         "transaction_count": int(len(transactions)),
         "category_count": int(len(categories)),
         "total_amount": total_amount,
-        "average_amount": float(transactions["amount"].mean()) if not transactions.empty else 0.0,
+        "average_amount": float(transactions["amount"].mean())
+        if not transactions.empty
+        else 0.0,
     }
 
 
@@ -464,7 +482,8 @@ def build_pdf_report(engine, user_id: int) -> bytes:
     if not category_summary.empty:
         story.append(Paragraph("Category Summary", styles["Heading2"]))
         category_table = [["Category", "Amount"]] + [
-            [row["category"], f"{float(row['amount']):.2f}"] for _, row in category_summary.iterrows()
+            [row["category"], f"{float(row['amount']):.2f}"]
+            for _, row in category_summary.iterrows()
         ]
         table = Table(category_table, hAlign="LEFT")
         table.setStyle(
@@ -482,7 +501,8 @@ def build_pdf_report(engine, user_id: int) -> bytes:
     if not trend_summary.empty:
         story.append(Paragraph("Trend Summary", styles["Heading2"]))
         trend_table = [["Period", "Amount"]] + [
-            [row["period"], f"{float(row['amount']):.2f}"] for _, row in trend_summary.iterrows()
+            [row["period"], f"{float(row['amount']):.2f}"]
+            for _, row in trend_summary.iterrows()
         ]
         table = Table(trend_table, hAlign="LEFT")
         table.setStyle(
@@ -550,7 +570,9 @@ def calculate_budget_recommendations(
         )
 
     merged = categories[["id", "name"]].rename(columns={"name": "category"}).copy()
-    merged = merged.merge(category_summary[["category", "amount"]], on="category", how="left")
+    merged = merged.merge(
+        category_summary[["category", "amount"]], on="category", how="left"
+    )
     merged["amount"] = pd.to_numeric(merged["amount"], errors="coerce").fillna(0.0)
     merged["spend_basis"] = merged["amount"].abs()
 

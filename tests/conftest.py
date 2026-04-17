@@ -108,18 +108,26 @@ def finance_engine():
             )
         )
         connection.execute(
-            text("INSERT INTO users (id, email, password_hash) VALUES (1, 'user@example.com', 'hash')")
+            text(
+                "INSERT INTO users (id, email, password_hash) VALUES (1, 'user@example.com', 'hash')"
+            )
         )
         connection.execute(
-            text("INSERT INTO categories (id, name, user_id) VALUES (1, 'Uncategorized', NULL)")
+            text(
+                "INSERT INTO categories (id, name, user_id) VALUES (1, 'Uncategorized', NULL)"
+            )
         )
         connection.execute(
-            text("INSERT INTO categories (id, name, user_id) VALUES (2, 'Groceries', 1)")
+            text(
+                "INSERT INTO categories (id, name, user_id) VALUES (2, 'Groceries', 1)"
+            )
         )
         connection.execute(
             text("INSERT INTO categories (id, name, user_id) VALUES (3, 'Travel', 1)")
         )
         connection.execute(
-            text("INSERT INTO description_rules (keyword, category_id, user_id) VALUES ('Whole Foods', 2, 1)")
+            text(
+                "INSERT INTO description_rules (keyword, category_id, user_id) VALUES ('Whole Foods', 2, 1)"
+            )
         )
     return engine

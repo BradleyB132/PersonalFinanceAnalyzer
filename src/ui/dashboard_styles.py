@@ -7,18 +7,18 @@ def build_dashboard_styles(t: dict[str, str]) -> str:
     return f"""
         <style>
             :root {{
-                --pf-edge: {t['edge']};
-                --pf-text: {t['text']};
-                --pf-muted: {t['muted']};
-                --pf-shadow: {t['shadow']};
-                --pf-chip-bg: {t['chip_bg']};
-                --pf-chip-border: {t['chip_border']};
-                --pf-pos: {t['pos']};
-                --pf-neg: {t['neg']};
+                --pf-edge: {t["edge"]};
+                --pf-text: {t["text"]};
+                --pf-muted: {t["muted"]};
+                --pf-shadow: {t["shadow"]};
+                --pf-chip-bg: {t["chip_bg"]};
+                --pf-chip-border: {t["chip_border"]};
+                --pf-pos: {t["pos"]};
+                --pf-neg: {t["neg"]};
             }}
 
             [data-testid="stAppViewContainer"] {{
-                background: {t['bg']};
+                background: {t["bg"]};
             }}
 
             [data-testid="stAppViewContainer"] .main .block-container {{
@@ -68,7 +68,7 @@ def build_dashboard_styles(t: dict[str, str]) -> str:
             }}
 
             [data-testid="stSidebar"] {{
-                background: {t['sidebar']};
+                background: {t["sidebar"]};
                 border-right: 1px solid rgba(140, 162, 201, 0.2);
             }}
 
@@ -181,7 +181,7 @@ def build_dashboard_styles(t: dict[str, str]) -> str:
             .pf-hero {{
                 padding: 1rem 1.15rem;
                 border-radius: 16px;
-                background: {t['hero']};
+                background: {t["hero"]};
                 border: 1px solid var(--pf-edge);
                 box-shadow: var(--pf-shadow);
                 margin-bottom: 0.8rem;
@@ -201,7 +201,7 @@ def build_dashboard_styles(t: dict[str, str]) -> str:
 
             .pf-card {{
                 border: 1px solid var(--pf-edge);
-                background: {t['panel']};
+                background: {t["panel"]};
                 border-radius: 14px;
                 padding: 0.9rem;
                 box-shadow: var(--pf-shadow);
@@ -229,7 +229,7 @@ def build_dashboard_styles(t: dict[str, str]) -> str:
 
             .pf-txn-card {{
                 border: 1px solid var(--pf-edge);
-                background: {t['txn_panel']};
+                background: {t["txn_panel"]};
                 border-radius: 12px;
                 padding: 0.72rem 0.85rem;
                 margin-bottom: 0.55rem;
@@ -254,7 +254,7 @@ def build_dashboard_styles(t: dict[str, str]) -> str:
 
             .pf-upload-card {{
                 border: 1px solid var(--pf-edge);
-                background: {t['panel']};
+                background: {t["panel"]};
                 border-radius: 14px;
                 padding: 1rem 1.05rem;
                 box-shadow: var(--pf-shadow);

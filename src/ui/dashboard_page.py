@@ -122,8 +122,16 @@ def _render_kpi_cards(metrics: dict[str, float]) -> None:
     cards = [
         ("Transactions", f"{int(metrics['transaction_count'])}", "Records uploaded"),
         ("Categories", f"{int(metrics['category_count'])}", "Mapped spending buckets"),
-        ("Total Flow", _fmt_currency(float(metrics["total_amount"])), "Net captured in system"),
-        ("Average Txn", _fmt_currency(float(metrics["average_amount"])), "Typical entry size"),
+        (
+            "Total Flow",
+            _fmt_currency(float(metrics["total_amount"])),
+            "Net captured in system",
+        ),
+        (
+            "Average Txn",
+            _fmt_currency(float(metrics["average_amount"])),
+            "Typical entry size",
+        ),
     ]
     for column, (title, value, note) in zip(st.columns(4), cards):
         column.markdown(
@@ -161,7 +169,9 @@ def _render_spend_trend_chart(trend_summary: pd.DataFrame, theme_mode: str) -> N
         return
 
     trend_frame = trend_summary.copy()
-    trend_frame["amount"] = pd.to_numeric(trend_frame["amount"], errors="coerce").fillna(0.0)
+    trend_frame["amount"] = pd.to_numeric(
+        trend_frame["amount"], errors="coerce"
+    ).fillna(0.0)
 
     area_fill = "#2aa5ff"
     line_color = "#ff7b39"
@@ -189,7 +199,9 @@ def _render_spend_trend_chart(trend_summary: pd.DataFrame, theme_mode: str) -> N
             ],
         )
     )
-    composed = _apply_chart_theme((area + line + points).properties(height=290), theme_mode)
+    composed = _apply_chart_theme(
+        (area + line + points).properties(height=290), theme_mode
+    )
     st.altair_chart(composed, use_container_width=True)
 
 
@@ -216,7 +228,9 @@ def _build_income_expense_series(transactions: pd.DataFrame) -> pd.DataFrame:
     return melted
 
 
-def _render_income_vs_expense_chart(transactions: pd.DataFrame, theme_mode: str) -> None:
+def _render_income_vs_expense_chart(
+    transactions: pd.DataFrame, theme_mode: str
+) -> None:
     frame = _build_income_expense_series(transactions)
     if frame.empty:
         st.info("Not enough data to render income vs expense trend yet.")
@@ -231,7 +245,9 @@ def _render_income_vs_expense_chart(transactions: pd.DataFrame, theme_mode: str)
     income_color = "#ff8a3d"
     expense_color = "#9d4dff"
 
-    hover = alt.selection_point(fields=["period_label"], on="pointerover", nearest=True, empty=False)
+    hover = alt.selection_point(
+        fields=["period_label"], on="pointerover", nearest=True, empty=False
+    )
 
     base = alt.Chart(frame).encode(
         x=alt.X(
@@ -240,11 +256,17 @@ def _render_income_vs_expense_chart(transactions: pd.DataFrame, theme_mode: str)
             title=None,
             axis=alt.Axis(labelAngle=0, labelPadding=12, tickSize=0, domain=False),
         ),
-        y=alt.Y("amount:Q", title=None, axis=alt.Axis(grid=False, domain=False, tickSize=0, format=",.0f")),
+        y=alt.Y(
+            "amount:Q",
+            title=None,
+            axis=alt.Axis(grid=False, domain=False, tickSize=0, format=",.0f"),
+        ),
         color=alt.Color(
             "series:N",
             title=None,
-            scale=alt.Scale(domain=["income", "expense"], range=[income_color, expense_color]),
+            scale=alt.Scale(
+                domain=["income", "expense"], range=[income_color, expense_color]
+            ),
             legend=alt.Legend(orient="bottom-right", labelLimit=180),
         ),
         tooltip=[
@@ -290,7 +312,9 @@ def _render_donut(
         return
 
     donut_frame = frame.copy()
-    donut_frame[amount_col] = pd.to_numeric(donut_frame[amount_col], errors="coerce").fillna(0.0)
+    donut_frame[amount_col] = pd.to_numeric(
+        donut_frame[amount_col], errors="coerce"
+    ).fillna(0.0)
     donut_frame = donut_frame[donut_frame[amount_col] > 0]
     donut_frame = donut_frame.sort_values(amount_col, ascending=False)
     if len(donut_frame.index) > 6:
@@ -302,7 +326,15 @@ def _render_donut(
         st.info("No spend values are available for donut chart.")
         return
 
-    palette = ["#ff8b4a", "#ff5f7b", "#47d6ff", "#8a86ff", "#ba8cff", "#36dfc1", "#f8cf52"]
+    palette = [
+        "#ff8b4a",
+        "#ff5f7b",
+        "#47d6ff",
+        "#8a86ff",
+        "#ba8cff",
+        "#36dfc1",
+        "#f8cf52",
+    ]
 
     is_category_mix = title.lower() == "category"
     is_large = chart_height >= 420
@@ -328,43 +360,41 @@ def _render_donut(
             strokeWidth=1.1,
         )
 
-    chart = (
-        base_chart
-        .encode(
-            theta=alt.Theta(f"{amount_col}:Q", stack=True),
-            color=alt.Color(
-                f"{category_col}:N",
-                scale=alt.Scale(range=palette),
-                legend=alt.Legend(
-                    title=title,
-                    orient="right",
-                    direction="vertical",
-                    symbolType="circle",
-                    symbolSize=130,
-                    labelFontSize=13,
-                    titleFontSize=14,
-                    labelLimit=180,
-                ),
+    chart = base_chart.encode(
+        theta=alt.Theta(f"{amount_col}:Q", stack=True),
+        color=alt.Color(
+            f"{category_col}:N",
+            scale=alt.Scale(range=palette),
+            legend=alt.Legend(
+                title=title,
+                orient="right",
+                direction="vertical",
+                symbolType="circle",
+                symbolSize=130,
+                labelFontSize=13,
+                titleFontSize=14,
+                labelLimit=180,
             ),
-            tooltip=[
-                alt.Tooltip(f"{category_col}:N", title="Category"),
-                alt.Tooltip(f"{amount_col}:Q", title="Amount", format=",.2f"),
-            ],
-        )
-        .properties(
-            height=(340 if is_category_mix else chart_height),
-            width="container",
-            padding=(
-                {"left": 18, "right": 0, "top": 0, "bottom": 0}
-                if is_category_mix
-                else {"left": 5, "right": 5, "top": 5, "bottom": 5}
-            ),
-        )
+        ),
+        tooltip=[
+            alt.Tooltip(f"{category_col}:N", title="Category"),
+            alt.Tooltip(f"{amount_col}:Q", title="Amount", format=",.2f"),
+        ],
+    ).properties(
+        height=(340 if is_category_mix else chart_height),
+        width="container",
+        padding=(
+            {"left": 18, "right": 0, "top": 0, "bottom": 0}
+            if is_category_mix
+            else {"left": 5, "right": 5, "top": 5, "bottom": 5}
+        ),
     )
     st.altair_chart(_apply_chart_theme(chart, theme_mode), use_container_width=True)
 
 
-def _render_recent_transaction_cards(engine, user_id: int, transactions: pd.DataFrame) -> None:
+def _render_recent_transaction_cards(
+    engine, user_id: int, transactions: pd.DataFrame
+) -> None:
     recent = transactions.head(8).copy()
     recent["amount"] = pd.to_numeric(recent["amount"], errors="coerce").fillna(0.0)
     categories = get_available_categories(engine, user_id)
@@ -387,12 +417,12 @@ def _render_recent_transaction_cards(engine, user_id: int, transactions: pd.Data
             <div class="pf-txn-card">
                 <div class="pf-txn-row">
                     <div>
-                        <div style="font-weight:700; color:var(--pf-text);">{str(row['description'])[:52]}</div>
-                        <div style="font-size:0.80rem; color:var(--pf-muted); margin-top:0.1rem;">{row['transaction_date']} | {source_type}</div>
+                        <div style="font-weight:700; color:var(--pf-text);">{str(row["description"])[:52]}</div>
+                        <div style="font-size:0.80rem; color:var(--pf-muted); margin-top:0.1rem;">{row["transaction_date"]} | {source_type}</div>
                     </div>
                     <div style="text-align:right;">
                         <div class="{amount_class}">{amount_value}</div>
-                        <div class="pf-chip">{row['category']}</div>
+                        <div class="pf-chip">{row["category"]}</div>
                     </div>
                 </div>
             </div>
@@ -400,13 +430,19 @@ def _render_recent_transaction_cards(engine, user_id: int, transactions: pd.Data
             unsafe_allow_html=True,
         )
         if str(row["category"]).lower() == "uncategorized" and category_lookup:
-            with st.expander(f"Categorize transaction #{int(row['id'])}", expanded=False):
+            with st.expander(
+                f"Categorize transaction #{int(row['id'])}", expanded=False
+            ):
                 selected_category = st.selectbox(
                     "Select category",
                     list(category_lookup.keys()),
                     key=f"recent_uncategorized_select_{int(row['id'])}",
                 )
-                if st.button("Save category", key=f"recent_uncategorized_save_{int(row['id'])}", type="primary"):
+                if st.button(
+                    "Save category",
+                    key=f"recent_uncategorized_save_{int(row['id'])}",
+                    type="primary",
+                ):
                     updated = update_transaction_category(
                         engine,
                         user_id=user_id,
@@ -432,14 +468,26 @@ def _render_sidebar(user, logout_callback) -> None:
             unsafe_allow_html=True,
         )
         st.caption(f"Signed in as: {user['email']}")
-        if st.button("Logout", key="sidebar_logout", use_container_width=True, type="primary"):
+        if st.button(
+            "Logout", key="sidebar_logout", use_container_width=True, type="primary"
+        ):
             logout_callback()
-        st.markdown('<div class="pf-sidebar-sep"></div><div class="pf-nav-title">Navigation</div>', unsafe_allow_html=True)
+        st.markdown(
+            '<div class="pf-sidebar-sep"></div><div class="pf-nav-title">Navigation</div>',
+            unsafe_allow_html=True,
+        )
         for index, section in enumerate(NAVIGATION_OPTIONS):
             is_active = st.session_state.dashboard_section == section
-            label = f"{NAV_ICONS.get(section, '•')}  {NAV_DISPLAY.get(section, section)}"
+            label = (
+                f"{NAV_ICONS.get(section, '•')}  {NAV_DISPLAY.get(section, section)}"
+            )
             button_type = "primary" if is_active else "secondary"
-            if st.button(label, key=f"sidebar_nav_{index}", use_container_width=True, type=button_type):
+            if st.button(
+                label,
+                key=f"sidebar_nav_{index}",
+                use_container_width=True,
+                type=button_type,
+            ):
                 if st.session_state.dashboard_section != section:
                     st.session_state.dashboard_section = section
                     st.rerun()
@@ -510,10 +558,14 @@ def _render_dashboard_overview(engine, user_id: int) -> None:
             else pd.DataFrame()
         )
         if not category_frame.empty:
-            category_frame["amount"] = pd.to_numeric(
-                category_frame["amount"], errors="coerce"
-            ).fillna(0.0).abs()
-            category_frame = category_frame.sort_values("amount", ascending=False).head(7)
+            category_frame["amount"] = (
+                pd.to_numeric(category_frame["amount"], errors="coerce")
+                .fillna(0.0)
+                .abs()
+            )
+            category_frame = category_frame.sort_values("amount", ascending=False).head(
+                7
+            )
         _render_donut(
             category_frame,
             "category",
@@ -522,6 +574,7 @@ def _render_dashboard_overview(engine, user_id: int) -> None:
             theme_mode,
             chart_height=340,
         )
+
 
 def _process_upload(engine, user_id: int, file_type: str, uploaded_file) -> None:
     try:
@@ -577,7 +630,7 @@ def _render_upload_section(engine, user_id: int, file_type: str, title: str) -> 
     with info_col:
         if uploaded_file is not None:
             st.markdown(
-                f"<div class=\"pf-upload-note\">Selected file: {uploaded_file.name}</div>",
+                f'<div class="pf-upload-note">Selected file: {uploaded_file.name}</div>',
                 unsafe_allow_html=True,
             )
 
@@ -607,12 +660,16 @@ def _render_transactions_section(engine, user_id: int) -> None:
         key="selected_transaction",
     )
     selected_transaction_id = transaction_labels[selected_label]
-    selected_transaction = get_transaction_by_id(engine, user_id, selected_transaction_id)
+    selected_transaction = get_transaction_by_id(
+        engine, user_id, selected_transaction_id
+    )
     if selected_transaction is None:
         st.error("Could not load the selected transaction.")
         return
 
-    category_lookup = {str(row["name"]): int(row["id"]) for _, row in categories.iterrows()}
+    category_lookup = {
+        str(row["name"]): int(row["id"]) for _, row in categories.iterrows()
+    }
     category_names = list(category_lookup.keys())
     default_index = 0
     current_category_id = int(selected_transaction["category_id"])
@@ -647,7 +704,9 @@ def _render_search_section(engine, user_id: int) -> None:
     st.write("Find transactions by keyword, category, date range, or amount.")
 
     categories = get_available_categories(engine, user_id)
-    category_lookup = {str(row["name"]): int(row["id"]) for _, row in categories.iterrows()}
+    category_lookup = {
+        str(row["name"]): int(row["id"]) for _, row in categories.iterrows()
+    }
 
     with st.form("search_form"):
         keyword = st.text_input("Keyword", placeholder="Walmart, Uber, Netflix")
@@ -658,7 +717,9 @@ def _render_search_section(engine, user_id: int) -> None:
         with col2:
             end_date = st.date_input("End date", value=None)
             max_amount = st.number_input("Maximum amount", value=0.0, step=1.0)
-        category_choice = st.selectbox("Category", ["All"] + list(category_lookup.keys()))
+        category_choice = st.selectbox(
+            "Category", ["All"] + list(category_lookup.keys())
+        )
         submitted = st.form_submit_button("Apply filters", type="primary")
 
     if submitted:
@@ -668,7 +729,9 @@ def _render_search_section(engine, user_id: int) -> None:
             keyword=keyword or None,
             start_date=start_date if isinstance(start_date, date) else None,
             end_date=end_date if isinstance(end_date, date) else None,
-            category_id=None if category_choice == "All" else category_lookup[category_choice],
+            category_id=None
+            if category_choice == "All"
+            else category_lookup[category_choice],
             min_amount=min_amount if min_amount > 0 else None,
             max_amount=max_amount if max_amount > 0 else None,
         )
@@ -788,23 +851,32 @@ def _render_budgeting_section(engine, user_id: int) -> None:
     col1, col2, col3 = st.columns(3)
     col1.metric("Recommended total", _fmt_currency(total_recommended))
     col2.metric("Current spend", _fmt_currency(total_spend))
-    col3.metric("Unallocated", _fmt_currency(max(monthly_income - total_recommended, 0.0)))
+    col3.metric(
+        "Unallocated", _fmt_currency(max(monthly_income - total_recommended, 0.0))
+    )
 
     overspent = recommendations[recommendations["overspent"]]
     if not overspent.empty:
-        st.warning("Overspent categories: " + ", ".join(overspent["category"].astype(str).tolist()))
+        st.warning(
+            "Overspent categories: "
+            + ", ".join(overspent["category"].astype(str).tolist())
+        )
 
     theme_mode = _resolve_theme_mode()
     left_col, right_col = st.columns([1.2, 1], gap="large")
     with left_col:
-        viz_frame = recommendations[["category", "actual_spend", "recommended_budget"]].copy()
+        viz_frame = recommendations[
+            ["category", "actual_spend", "recommended_budget"]
+        ].copy()
         viz_melted = viz_frame.melt(
             id_vars=["category"],
             value_vars=["actual_spend", "recommended_budget"],
             var_name="series",
             value_name="amount",
         )
-        viz_melted["amount"] = pd.to_numeric(viz_melted["amount"], errors="coerce").fillna(0.0)
+        viz_melted["amount"] = pd.to_numeric(
+            viz_melted["amount"], errors="coerce"
+        ).fillna(0.0)
         bar_colors = ["#fb7185", "#44d2ff"]
         budget_chart = (
             alt.Chart(viz_melted)
@@ -812,9 +884,15 @@ def _render_budgeting_section(engine, user_id: int) -> None:
             .encode(
                 x=alt.X("category:N", title="Category"),
                 y=alt.Y("amount:Q", title="Amount"),
-                color=alt.Color("series:N", scale=alt.Scale(range=bar_colors), title="Series"),
+                color=alt.Color(
+                    "series:N", scale=alt.Scale(range=bar_colors), title="Series"
+                ),
                 xOffset="series:N",
-                tooltip=["category:N", "series:N", alt.Tooltip("amount:Q", format=",.2f")],
+                tooltip=[
+                    "category:N",
+                    "series:N",
+                    alt.Tooltip("amount:Q", format=",.2f"),
+                ],
             )
             .properties(height=320)
         )
@@ -825,7 +903,10 @@ def _render_budgeting_section(engine, user_id: int) -> None:
         budget_split = pd.DataFrame(
             [
                 {"category": "Budgeted", "amount": max(total_recommended, 0.0)},
-                {"category": "Remaining", "amount": max(monthly_income - total_recommended, 0.0)},
+                {
+                    "category": "Remaining",
+                    "amount": max(monthly_income - total_recommended, 0.0),
+                },
             ]
         )
         st.subheader("Budget Usage")
@@ -855,7 +936,9 @@ def render_dashboard_page(engine, logout_callback) -> None:
     if section == "Dashboard":
         _render_dashboard_overview(engine, int(user["id"]))
     elif section == "Upload Bank Statement":
-        _render_upload_section(engine, int(user["id"]), "bank_statement", "Upload Bank Statement")
+        _render_upload_section(
+            engine, int(user["id"]), "bank_statement", "Upload Bank Statement"
+        )
     elif section == "Upload Credit Card Statement":
         _render_upload_section(
             engine,
