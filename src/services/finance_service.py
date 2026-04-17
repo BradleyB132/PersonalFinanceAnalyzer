@@ -31,6 +31,15 @@ COLUMN_ALIASES = {
     "details": "description",
     "memo": "description",
     "payee": "description",
+    "merchant": "description",
+    "narrative": "description",
+    "transaction description": "description",
+    "debit": "debit",
+    "withdrawal": "debit",
+    "charge": "debit",
+    "credit": "credit",
+    "deposit": "credit",
+    "payment": "credit",
     "amount": "amount",
     "description": "description",
     "transaction_date": "transaction_date",
@@ -41,6 +50,7 @@ COLUMN_ALIASES = {
 class StatementImportResult:
     uploaded_file_id: int
     inserted_count: int
+    skipped_count: int
     file_type: str
 
 
@@ -61,15 +71,49 @@ def _coerce_date(value: Any) -> date:
 
 
 def _coerce_amount(value: Any) -> float:
+    if isinstance(value, str):
+        cleaned = value.strip().replace(",", "").replace("$", "")
+        if cleaned.startswith("(") and cleaned.endswith(")"):
+            cleaned = f"-{cleaned[1:-1]}"
+        try:
+            return float(cleaned)
+        except ValueError as exc:
+            raise ValueError(f"Invalid amount: {value}") from exc
+
     try:
         return float(value)
     except (TypeError, ValueError) as exc:
         raise ValueError(f"Invalid amount: {value}") from exc
 
 
+def _derive_amount_from_debit_credit(frame: pd.DataFrame) -> pd.DataFrame:
+    derived = frame.copy()
+    if "amount" in derived.columns:
+        return derived
+
+    if "debit" not in derived.columns and "credit" not in derived.columns:
+        return derived
+
+    debit_series = (
+        derived["debit"].apply(_coerce_amount)
+        if "debit" in derived.columns
+        else pd.Series([0.0] * len(derived), index=derived.index)
+    )
+    credit_series = (
+        derived["credit"].apply(_coerce_amount)
+        if "credit" in derived.columns
+        else pd.Series([0.0] * len(derived), index=derived.index)
+    )
+
+    # Debit-like values are treated as outgoing spend (negative), credits as inflow (positive).
+    derived["amount"] = credit_series - debit_series.abs()
+    return derived
+
+
 def _statement_frame_from_bytes(file_bytes: bytes) -> pd.DataFrame:
     frame = pd.read_csv(BytesIO(file_bytes))
     frame = _normalize_columns(frame)
+    frame = _derive_amount_from_debit_credit(frame)
     missing = STATEMENT_REQUIRED_COLUMNS - set(frame.columns)
     if missing:
         raise ValueError(
@@ -168,12 +212,13 @@ def import_statement_file(
     uploaded_file_id = int(uploaded["id"])
 
     inserted_count = 0
+    skipped_count = 0
     for record in frame.to_dict(orient="records"):
         description = str(record["description"]).strip()
         category_id = resolve_category_id(engine, user_id, description)
         amount = _coerce_amount(record["amount"])
         transaction_date = _coerce_date(record["transaction_date"])
-        execute_write(
+        result = execute_write(
             """
             INSERT INTO transactions (
                 user_id,
@@ -183,13 +228,20 @@ def import_statement_file(
                 transaction_date,
                 uploaded_file_id
             )
-            VALUES (
+            SELECT
                 :user_id,
                 :category_id,
                 :amount,
                 :description,
                 :transaction_date,
                 :uploaded_file_id
+            WHERE NOT EXISTS (
+                SELECT 1
+                FROM transactions t
+                WHERE t.user_id = :user_id
+                  AND DATE(t.transaction_date) = :transaction_date
+                  AND LOWER(TRIM(t.description)) = LOWER(TRIM(:description))
+                  AND t.amount = :amount
             )
             """,
             {
@@ -202,11 +254,15 @@ def import_statement_file(
             },
             engine=engine,
         )
-        inserted_count += 1
+        if result.rowcount > 0:
+            inserted_count += 1
+        else:
+            skipped_count += 1
 
     return StatementImportResult(
         uploaded_file_id=uploaded_file_id,
         inserted_count=inserted_count,
+        skipped_count=skipped_count,
         file_type=file_type,
     )
 
@@ -222,9 +278,11 @@ def get_transactions(engine, user_id: int) -> pd.DataFrame:
             t.transaction_date,
             c.name AS category,
             c.id AS category_id,
-            t.uploaded_file_id
+            t.uploaded_file_id,
+            COALESCE(uf.file_type, 'manual') AS source_type
         FROM transactions t
         JOIN categories c ON c.id = t.category_id
+        LEFT JOIN uploaded_files uf ON uf.id = t.uploaded_file_id
         WHERE t.user_id = :user_id
         ORDER BY t.transaction_date DESC, t.id DESC
         """,
@@ -301,9 +359,11 @@ def search_transactions(
             t.transaction_date,
             c.name AS category,
             c.id AS category_id,
-            t.uploaded_file_id
+            t.uploaded_file_id,
+            COALESCE(uf.file_type, 'manual') AS source_type
         FROM transactions t
         JOIN categories c ON c.id = t.category_id
+        LEFT JOIN uploaded_files uf ON uf.id = t.uploaded_file_id
         WHERE {' AND '.join(where_clauses)}
         ORDER BY t.transaction_date DESC, t.id DESC
         """,
@@ -376,6 +436,7 @@ def build_transactions_csv(engine, user_id: int) -> bytes:
                 "category",
                 "category_id",
                 "uploaded_file_id",
+                "source_type",
             ]
         )
     return frame.to_csv(index=False).encode("utf-8")
@@ -470,6 +531,9 @@ def calculate_budget_recommendations(
     monthly_income: float,
     priority_categories: list[str] | None = None,
 ) -> pd.DataFrame:
+    if not math.isfinite(monthly_income) or monthly_income <= 0:
+        raise ValueError("Monthly income must be a positive number")
+
     categories = get_available_categories(engine, user_id)
     category_summary = get_category_summary(engine, user_id)
     if categories.empty:
@@ -487,10 +551,12 @@ def calculate_budget_recommendations(
 
     merged = categories[["id", "name"]].rename(columns={"name": "category"}).copy()
     merged = merged.merge(category_summary[["category", "amount"]], on="category", how="left")
-    merged["amount"] = merged["amount"].fillna(0.0)
+    merged["amount"] = pd.to_numeric(merged["amount"], errors="coerce").fillna(0.0)
+    merged["spend_basis"] = merged["amount"].abs()
 
-    if merged["amount"].sum() > 0:
-        merged["weight"] = merged["amount"] / merged["amount"].sum()
+    spend_total = float(merged["spend_basis"].sum())
+    if spend_total > 0:
+        merged["weight"] = merged["spend_basis"] / spend_total
     else:
         merged["weight"] = 1.0 / len(merged)
 
@@ -499,11 +565,24 @@ def calculate_budget_recommendations(
     merged["weight"] = merged.apply(
         lambda row: row["weight"] * (1.15 if row["priority"] else 1.0), axis=1
     )
-    merged["weight"] = merged["weight"] / merged["weight"].sum()
+    weight_total = float(merged["weight"].sum())
+    if weight_total <= 0 or not math.isfinite(weight_total):
+        merged["weight"] = 1.0 / len(merged)
+    else:
+        merged["weight"] = merged["weight"] / weight_total
+
     merged["recommended_budget"] = merged["weight"] * monthly_income
-    merged["overspent"] = merged["amount"] > merged["recommended_budget"]
-    merged["variance"] = merged["recommended_budget"] - merged["amount"]
-    merged = merged.sort_values(["overspent", "amount"], ascending=[False, False])
+    merged["overspent"] = merged["spend_basis"] > merged["recommended_budget"]
+    merged["variance"] = merged["recommended_budget"] - merged["spend_basis"]
+    merged = merged.sort_values(["overspent", "spend_basis"], ascending=[False, False])
     return merged[
-        ["category", "amount", "weight", "recommended_budget", "priority", "overspent", "variance"]
-    ].rename(columns={"amount": "actual_spend"})
+        [
+            "category",
+            "spend_basis",
+            "weight",
+            "recommended_budget",
+            "priority",
+            "overspent",
+            "variance",
+        ]
+    ].rename(columns={"spend_basis": "actual_spend"})

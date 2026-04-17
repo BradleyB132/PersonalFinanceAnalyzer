@@ -28,6 +28,28 @@ def _statement_csv() -> bytes:
     return buffer.getvalue()
 
 
+def _credit_card_statement_csv() -> bytes:
+    frame = pd.DataFrame(
+        [
+            {
+                "posted date": "2024-02-01",
+                "merchant": "Uber Trip",
+                "debit": "27.45",
+                "credit": "0",
+            },
+            {
+                "posted date": "2024-02-02",
+                "merchant": "Card Payment",
+                "debit": "0",
+                "credit": "150.00",
+            },
+        ]
+    )
+    buffer = BytesIO()
+    frame.to_csv(buffer, index=False)
+    return buffer.getvalue()
+
+
 def test_import_statement_and_category_resolution(finance_engine) -> None:
     result = import_statement_file(
         finance_engine,
@@ -104,3 +126,49 @@ def test_budget_recommendations_use_priority_categories(finance_engine) -> None:
         "variance",
     }
     assert recommendations[recommendations["category"] == "Travel"]["priority"].iloc[0]
+
+
+def test_credit_card_upload_is_in_combined_transactions(finance_engine) -> None:
+    import_statement_file(
+        finance_engine,
+        user_id=1,
+        file_name="bank.csv",
+        file_type="bank_statement",
+        file_bytes=_statement_csv(),
+    )
+    import_statement_file(
+        finance_engine,
+        user_id=1,
+        file_name="credit.csv",
+        file_type="credit_card_statement",
+        file_bytes=_credit_card_statement_csv(),
+    )
+
+    transactions = get_transactions(finance_engine, 1)
+    assert len(transactions) == 4
+    assert "Uber Trip" in transactions["description"].tolist()
+    assert "Card Payment" in transactions["description"].tolist()
+    assert "credit_card_statement" in transactions["source_type"].tolist()
+
+
+def test_reupload_same_statement_skips_duplicates(finance_engine) -> None:
+    first = import_statement_file(
+        finance_engine,
+        user_id=1,
+        file_name="statement.csv",
+        file_type="bank_statement",
+        file_bytes=_statement_csv(),
+    )
+    second = import_statement_file(
+        finance_engine,
+        user_id=1,
+        file_name="statement.csv",
+        file_type="bank_statement",
+        file_bytes=_statement_csv(),
+    )
+
+    transactions = get_transactions(finance_engine, 1)
+    assert first.inserted_count == 2
+    assert second.inserted_count == 0
+    assert second.skipped_count == 2
+    assert len(transactions) == 2
