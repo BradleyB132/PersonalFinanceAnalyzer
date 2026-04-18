@@ -18,6 +18,7 @@ import pandas as pd
 
 from db import execute_query, execute_write, fetch_one
 
+# .csv files must contain at least these columns (after normalization and aliasing)
 STATEMENT_REQUIRED_COLUMNS = {
     "amount",
     "description",
