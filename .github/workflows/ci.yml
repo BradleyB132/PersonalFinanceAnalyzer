@@ -1,0 +1,38 @@
+name: CI
+
+on:
+  pull_request:
+    branches:
+      - main
+      - develop
+  workflow_dispatch:
+
+jobs:
+  pre-commit:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          # Ensure full git history is available for tools that compute
+          # diffs or revisions (prevents gitleaks and similar tools from
+          # failing due to shallow clones).
+          fetch-depth: 0
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install Poetry
+        run: pip install poetry
+
+      - name: Refresh poetry lock (if pyproject changed)
+        run: poetry lock --no-interaction || true
+
+      - name: Install dependencies
+        run: poetry install --with dev --no-interaction
+
+      - name: Run pre-commit
+        run: poetry run pre-commit run --all-files
