@@ -9,10 +9,12 @@ import math
 from typing import Any
 
 import pandas as pd
-from reportlab.lib import colors
-from reportlab.lib.pagesizes import letter
-from reportlab.lib.styles import getSampleStyleSheet
-from reportlab.platypus import Paragraph, SimpleDocTemplate, Spacer, Table, TableStyle
+# The ReportLab library is an optional dependency used only for PDF report
+# generation. Importing it at module import time causes the entire application
+# to fail when the package is not installed (ModuleNotFoundError). To avoid
+# that and to allow the rest of the service to function without ReportLab,
+# we perform lazy imports inside `build_pdf_report` where they are required.
+
 
 from db import execute_query, execute_write, fetch_one
 
@@ -315,19 +317,52 @@ def get_transaction_by_id(
 def update_transaction_category(
     engine, user_id: int, transaction_id: int, category_id: int
 ) -> bool:
+    # First, fetch the transaction so we can determine its normalized description.
+    # If the transaction does not exist or does not belong to the user, return False.
+    tx = get_transaction_by_id(engine, user_id, transaction_id)
+    if tx is None:
+        return False
+
+    # Normalize the description for matching: trim and lower-case.
+    description = str(tx.get("description", "")).strip()
+    if not description:
+        # If there's no description, fall back to updating only the specific id.
+        result = execute_write(
+            """
+            UPDATE transactions
+            SET category_id = :category_id
+            WHERE user_id = :user_id AND id = :transaction_id
+            """,
+            {
+                "user_id": user_id,
+                "transaction_id": transaction_id,
+                "category_id": category_id,
+            },
+            engine=engine,
+        )
+        return result.rowcount > 0
+
+    # Update all transactions for this user that have the same normalized description.
+    # This implements the behavior: when a user updates a transaction's category,
+    # apply the same category to other transactions with identical descriptions for
+    # that user. Comparison is case-insensitive and trims whitespace.
     result = execute_write(
         """
         UPDATE transactions
         SET category_id = :category_id
-        WHERE user_id = :user_id AND id = :transaction_id
+        WHERE user_id = :user_id
+          AND LOWER(TRIM(description)) = LOWER(TRIM(:description))
         """,
         {
             "user_id": user_id,
-            "transaction_id": transaction_id,
             "category_id": category_id,
+            "description": description,
         },
         engine=engine,
     )
+
+    # result.rowcount may be >1 when multiple transactions matched; return True
+    # if at least one row was updated.
     return result.rowcount > 0
 
 
@@ -467,6 +502,19 @@ def build_pdf_report(engine, user_id: int) -> bytes:
     transactions = get_transactions(engine, user_id).head(10)
 
     buffer = BytesIO()
+    # Lazy import ReportLab to avoid hard dependency at module import time.
+    # This allows the application to run when ReportLab is not installed
+    # and only raises a clear error when the PDF report functionality is used.
+    try:
+        from reportlab.lib import colors
+        from reportlab.lib.pagesizes import letter
+        from reportlab.lib.styles import getSampleStyleSheet
+        from reportlab.platypus import Paragraph, SimpleDocTemplate, Spacer, Table, TableStyle
+    except Exception as exc:  # pragma: no cover - runtime import error
+        raise RuntimeError(
+            "ReportLab library is required to build PDF reports. Install 'reportlab'"
+        ) from exc
+
     document = SimpleDocTemplate(buffer, pagesize=letter)
     styles = getSampleStyleSheet()
     story = [
@@ -551,11 +599,129 @@ def calculate_budget_recommendations(
     monthly_income: float,
     priority_categories: list[str] | None = None,
 ) -> pd.DataFrame:
+    """Generate budget recommendations based on recent transaction history.
+
+    This function computes category recommended budgets by inspecting up to
+    one year's worth of transactions ending at the most recent transaction
+    date for the given user. The rules implemented:
+
+    - Determine the last transaction date (end_date). Use that as the end of
+      the analysis window rather than today's date.
+    - Compute a candidate start_date which is exactly one year before the
+      end_date (using a 1-year offset).
+    - If the user's oldest transaction is newer than start_date (i.e. less
+      than a full year's data), use the oldest transaction as the start of
+      the window. This ensures we use the available history and divide by
+      the actual number of months represented.
+    - Compute the number of months included in the window as the calendar
+      month count inclusive between start and end (minimum 1).
+    - Aggregate total spend per category within the window and compute a
+      monthly average by dividing by months_used. Downstream logic uses the
+      absolute value of amounts so both debits and credits are handled.
+
+    Args:
+        engine: SQLAlchemy engine used for DB access.
+        user_id: ID of the user to analyze.
+        monthly_income: User's reported monthly income used to scale budgets.
+        priority_categories: Optional list of category names to boost weight.
+
+    Returns:
+        pd.DataFrame with columns [category, actual_spend, weight,
+        recommended_budget, priority, overspent, variance]
+
+    Complexity:
+        Time: O(T + C log C) where T is number of transactions in the period
+        and C is number of categories. Groupby and merges dominate.
+        Space: O(T + C).
+    """
+
     if not math.isfinite(monthly_income) or monthly_income <= 0:
         raise ValueError("Monthly income must be a positive number")
 
+    # Load all transactions for the user; we'll select the most recent year
+    transactions = get_transactions(engine, user_id)
+    if transactions.empty:
+        # No transaction data to base recommendations on, return empty schema
+        return pd.DataFrame(
+            columns=[
+                "category",
+                "actual_spend",
+                "weight",
+                "recommended_budget",
+                "priority",
+                "overspent",
+                "variance",
+            ]
+        )
+
+    # Ensure transaction_date is a datetime so we can compute date ranges
+    transactions["transaction_date"] = pd.to_datetime(
+        transactions["transaction_date"], errors="coerce"
+    )
+
+    # Determine the analysis window: end at the most recent transaction date
+    last_ts = transactions["transaction_date"].max()
+    if pd.isna(last_ts):
+        # If dates couldn't be parsed, fall back to empty result
+        return pd.DataFrame(
+            columns=[
+                "category",
+                "actual_spend",
+                "weight",
+                "recommended_budget",
+                "priority",
+                "overspent",
+                "variance",
+            ]
+        )
+
+    # Start candidate is one year before the last transaction
+    one_year_before = last_ts - pd.DateOffset(years=1)
+
+    # Oldest transaction date available for the user
+    first_ts = transactions["transaction_date"].min()
+
+    # If we don't have a full year's data, use the oldest transaction date
+    window_start = first_ts if first_ts > one_year_before else one_year_before
+
+    # Define months used inclusive: e.g., Jan to Mar -> 3 months
+    months_used = (last_ts.year - window_start.year) * 12 + (
+        last_ts.month - window_start.month
+    ) + 1
+    if months_used <= 0:
+        months_used = 1
+
+    # Filter transactions inside the analysis window
+    mask = (transactions["transaction_date"] >= window_start) & (
+        transactions["transaction_date"] <= last_ts
+    )
+    window_tx = transactions.loc[mask].copy()
+
+    # Aggregate spend per category for the window
+    if window_tx.empty:
+        # No transactions in window, return empty schema
+        return pd.DataFrame(
+            columns=[
+                "category",
+                "actual_spend",
+                "weight",
+                "recommended_budget",
+                "priority",
+                "overspent",
+                "variance",
+            ]
+        )
+
+    category_totals = (
+        window_tx.groupby("category")["amount"].sum().reset_index(name="amount")
+    )
+
+    # Convert to numeric and take absolute spend basis (treat outflows as positive)
+    category_totals["amount"] = pd.to_numeric(category_totals["amount"], errors="coerce").fillna(0.0)
+    category_totals["spend_basis"] = category_totals["amount"].abs() / float(months_used)
+
+    # Get available categories list so we include categories with zero spend
     categories = get_available_categories(engine, user_id)
-    category_summary = get_category_summary(engine, user_id)
     if categories.empty:
         return pd.DataFrame(
             columns=[
@@ -570,33 +736,37 @@ def calculate_budget_recommendations(
         )
 
     merged = categories[["id", "name"]].rename(columns={"name": "category"}).copy()
-    merged = merged.merge(
-        category_summary[["category", "amount"]], on="category", how="left"
-    )
-    merged["amount"] = pd.to_numeric(merged["amount"], errors="coerce").fillna(0.0)
-    merged["spend_basis"] = merged["amount"].abs()
+    merged = merged.merge(category_totals[["category", "spend_basis"]], on="category", how="left")
+    merged["spend_basis"] = pd.to_numeric(merged["spend_basis"], errors="coerce").fillna(0.0)
 
+    # Compute weights proportional to historical spend (monthly average)
     spend_total = float(merged["spend_basis"].sum())
     if spend_total > 0:
         merged["weight"] = merged["spend_basis"] / spend_total
     else:
         merged["weight"] = 1.0 / len(merged)
 
+    # Boost weights for priority categories
     priority_set = {category.lower() for category in (priority_categories or [])}
     merged["priority"] = merged["category"].str.lower().isin(priority_set)
     merged["weight"] = merged.apply(
         lambda row: row["weight"] * (1.15 if row["priority"] else 1.0), axis=1
     )
+
+    # Normalize weights
     weight_total = float(merged["weight"].sum())
     if weight_total <= 0 or not math.isfinite(weight_total):
         merged["weight"] = 1.0 / len(merged)
     else:
         merged["weight"] = merged["weight"] / weight_total
 
+    # Recommended budget is proportional weight * monthly income
     merged["recommended_budget"] = merged["weight"] * monthly_income
     merged["overspent"] = merged["spend_basis"] > merged["recommended_budget"]
     merged["variance"] = merged["recommended_budget"] - merged["spend_basis"]
     merged = merged.sort_values(["overspent", "spend_basis"], ascending=[False, False])
+
+    # Return with requested column names, treating spend_basis as actual_spend
     return merged[
         [
             "category",
