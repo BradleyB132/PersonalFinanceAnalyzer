@@ -40,7 +40,7 @@ Quickstart using Poetry:
 7. Run the Streamlit app via Poetry:
 
    ```bash
-   poetry run streamlit run src/app.py
+   poetry run streamlit run main.py
    ```
 
 Notes:
