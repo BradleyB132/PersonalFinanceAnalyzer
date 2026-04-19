@@ -1,5 +1,21 @@
 [theme]
-base = "dark"
+base = "light"
+primaryColor = "#4A6741"
+backgroundColor = "#F9F8F6"
+secondaryBackgroundColor = "#FFFFFF"
+textColor = "#2C302B"
+font = "sans serif"
+
+[server]
+port = 3000
+address = "0.0.0.0"
+enableCORS = false
+enableXsrfProtection = false
+headless = true
+
+[browser]
+gatherUsageStats = false
 
 [client]
 toolbarMode = "minimal"
+showErrorDetails = true

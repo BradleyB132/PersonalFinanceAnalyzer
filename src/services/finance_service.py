@@ -6,9 +6,11 @@ from dataclasses import dataclass
 from datetime import date
 from io import BytesIO
 import math
+import re
 from typing import Any
 
 import pandas as pd
+import pdfplumber
 from reportlab.lib import colors
 from reportlab.lib.pagesizes import letter
 from reportlab.lib.styles import getSampleStyleSheet
@@ -52,6 +54,15 @@ class StatementImportResult:
     inserted_count: int
     skipped_count: int
     file_type: str
+
+
+@dataclass(frozen=True)
+class BudgetSnapshot:
+    monthly_income: float
+    priority_categories: list[str]
+    recommendations: list[dict[str, Any]]
+    alerts: list[dict[str, Any]]
+    current_spending: list[dict[str, Any]]
 
 
 def _normalize_columns(frame: pd.DataFrame) -> pd.DataFrame:
@@ -128,6 +139,64 @@ def _statement_frame_from_bytes(file_bytes: bytes) -> pd.DataFrame:
     return frame[list(STATEMENT_REQUIRED_COLUMNS)]
 
 
+def _statement_frame_from_pdf_bytes(file_bytes: bytes) -> pd.DataFrame:
+    records: list[dict[str, Any]] = []
+    date_pattern = re.compile(r"(\d{4}-\d{2}-\d{2}|\d{1,2}[/-]\d{1,2}[/-]\d{2,4})")
+    amount_pattern = re.compile(r"[-+]?\$?[\d,]+(?:\.\d{2})?")
+
+    with pdfplumber.open(BytesIO(file_bytes)) as pdf:
+        for page in pdf.pages:
+            text = page.extract_text() or ""
+            for raw_line in text.splitlines():
+                line = raw_line.strip()
+                if not line:
+                    continue
+                date_match = date_pattern.search(line)
+                amount_matches = amount_pattern.findall(line)
+                if not date_match or not amount_matches:
+                    continue
+
+                tx_date = date_match.group(1)
+                amount_raw = amount_matches[-1]
+                amount_clean = amount_raw.replace("$", "").replace(",", "")
+                if not amount_clean:
+                    continue
+
+                description = line[: date_match.start()] + " " + line[date_match.end() :]
+                description = description.replace(amount_raw, "").strip(" -|\t")
+                if not description:
+                    description = "Statement transaction"
+
+                records.append(
+                    {
+                        "transaction_date": tx_date,
+                        "description": description,
+                        "amount": amount_clean,
+                    }
+                )
+
+    frame = pd.DataFrame(records)
+    if frame.empty:
+        raise ValueError("No transactions were detected in the uploaded PDF")
+
+    frame = _normalize_columns(frame)
+    missing = STATEMENT_REQUIRED_COLUMNS - set(frame.columns)
+    if missing:
+        raise ValueError(
+            "PDF parsing failed. Missing required columns: " + ", ".join(sorted(missing))
+        )
+    return frame[list(STATEMENT_REQUIRED_COLUMNS)]
+
+
+def _statement_frame_from_file(file_name: str, file_bytes: bytes) -> pd.DataFrame:
+    lowered = file_name.lower()
+    if lowered.endswith(".pdf"):
+        return _statement_frame_from_pdf_bytes(file_bytes)
+    if lowered.endswith(".csv"):
+        return _statement_frame_from_bytes(file_bytes)
+    raise ValueError("Unsupported file type. Please upload a CSV or PDF statement.")
+
+
 def get_available_categories(engine, user_id: int) -> pd.DataFrame:
     rows = execute_query(
         """
@@ -193,7 +262,7 @@ def import_statement_file(
     file_type: str,
     file_bytes: bytes,
 ) -> StatementImportResult:
-    frame = _statement_frame_from_bytes(file_bytes)
+    frame = _statement_frame_from_file(file_name, file_bytes)
 
     execute_write(
         """
@@ -273,6 +342,203 @@ def import_statement_file(
     )
 
 
+def _ensure_budget_settings_table(engine) -> None:
+    execute_write(
+        """
+        CREATE TABLE IF NOT EXISTS budget_settings (
+            user_id INTEGER PRIMARY KEY,
+            monthly_income REAL NOT NULL,
+            priority_categories TEXT,
+            updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+        )
+        """,
+        engine=engine,
+    )
+
+
+def get_budget_settings(engine, user_id: int) -> dict[str, Any] | None:
+    _ensure_budget_settings_table(engine)
+    row = fetch_one(
+        """
+        SELECT user_id, monthly_income, priority_categories
+        FROM budget_settings
+        WHERE user_id = :user_id
+        """,
+        {"user_id": user_id},
+        engine=engine,
+    )
+    if row is None:
+        return None
+
+    priority_raw = str(row.get("priority_categories") or "")
+    priority = [item.strip() for item in priority_raw.split(",") if item.strip()]
+    return {
+        "user_id": int(row["user_id"]),
+        "monthly_income": float(row["monthly_income"]),
+        "priority_categories": priority,
+    }
+
+
+def upsert_budget_settings(
+    engine,
+    user_id: int,
+    monthly_income: float,
+    priority_categories: list[str] | None = None,
+) -> None:
+    _ensure_budget_settings_table(engine)
+    priority_serialized = ",".join(priority_categories or [])
+    execute_write(
+        """
+        INSERT INTO budget_settings (user_id, monthly_income, priority_categories)
+        VALUES (:user_id, :monthly_income, :priority_categories)
+        ON CONFLICT(user_id) DO UPDATE SET
+            monthly_income = excluded.monthly_income,
+            priority_categories = excluded.priority_categories,
+            updated_at = CURRENT_TIMESTAMP
+        """,
+        {
+            "user_id": user_id,
+            "monthly_income": monthly_income,
+            "priority_categories": priority_serialized,
+        },
+        engine=engine,
+    )
+
+
+def get_budget_snapshot(engine, user_id: int) -> BudgetSnapshot:
+    settings = get_budget_settings(engine, user_id)
+    if settings is None:
+        return BudgetSnapshot(
+            monthly_income=0.0,
+            priority_categories=[],
+            recommendations=[],
+            alerts=[],
+            current_spending=[],
+        )
+
+    transactions = get_transactions(engine, user_id)
+    monthly_income = float(settings["monthly_income"])
+
+    if transactions.empty:
+        return BudgetSnapshot(
+            monthly_income=monthly_income,
+            priority_categories=settings["priority_categories"],
+            recommendations=[
+                {
+                    "category": "Needs (50%)",
+                    "budget": round(monthly_income * 0.50, 2),
+                    "spent": 0.0,
+                    "remaining": round(monthly_income * 0.50, 2),
+                },
+                {
+                    "category": "Wants (30%)",
+                    "budget": round(monthly_income * 0.30, 2),
+                    "spent": 0.0,
+                    "remaining": round(monthly_income * 0.30, 2),
+                },
+                {
+                    "category": "Savings (20%)",
+                    "budget": round(monthly_income * 0.20, 2),
+                    "spent": 0.0,
+                    "remaining": round(monthly_income * 0.20, 2),
+                },
+            ],
+            alerts=[],
+            current_spending=[],
+        )
+
+    tx = transactions.copy()
+    tx["amount"] = pd.to_numeric(tx["amount"], errors="coerce").fillna(0.0)
+    tx["transaction_date"] = pd.to_datetime(tx["transaction_date"], errors="coerce")
+    tx = tx.dropna(subset=["transaction_date"])
+    if tx.empty:
+        return BudgetSnapshot(
+            monthly_income=monthly_income,
+            priority_categories=settings["priority_categories"],
+            recommendations=[],
+            alerts=[],
+            current_spending=[],
+        )
+
+    current_month = pd.Timestamp.now().strftime("%Y-%m")
+    month_tx = tx[tx["transaction_date"].dt.strftime("%Y-%m") == current_month].copy()
+    month_tx = month_tx[month_tx["amount"] < 0]
+    month_tx["spent"] = month_tx["amount"].abs()
+
+    category_spending_series = (
+        month_tx.groupby("category", as_index=True)["spent"].sum()
+        if not month_tx.empty
+        else pd.Series(dtype="float64")
+    )
+    category_spending = {
+        str(key): float(value) for key, value in category_spending_series.items()
+    }
+
+    needs_categories = {"Groceries", "Utilities", "Transportation", "Healthcare"}
+    wants_categories = {"Dining", "Shopping", "Entertainment", "Subscriptions"}
+
+    needs_budget = monthly_income * 0.50
+    wants_budget = monthly_income * 0.30
+    savings_budget = monthly_income * 0.20
+
+    needs_spent = sum(
+        amount for category, amount in category_spending.items() if category in needs_categories
+    )
+    wants_spent = sum(
+        amount for category, amount in category_spending.items() if category in wants_categories
+    )
+
+    recommendations = [
+        {
+            "category": "Needs (50%)",
+            "budget": round(needs_budget, 2),
+            "spent": round(needs_spent, 2),
+            "remaining": round(needs_budget - needs_spent, 2),
+        },
+        {
+            "category": "Wants (30%)",
+            "budget": round(wants_budget, 2),
+            "spent": round(wants_spent, 2),
+            "remaining": round(wants_budget - wants_spent, 2),
+        },
+        {
+            "category": "Savings (20%)",
+            "budget": round(savings_budget, 2),
+            "spent": 0.0,
+            "remaining": round(savings_budget, 2),
+        },
+    ]
+
+    alerts: list[dict[str, Any]] = []
+    rough_per_category = monthly_income * 0.10
+    for category, spent in category_spending.items():
+        if spent > rough_per_category * 1.5:
+            alerts.append(
+                {
+                    "category": category,
+                    "message": (
+                        f"Spending in {category} (${spent:,.2f}) exceeds recommended amount"
+                    ),
+                    "severity": "warning",
+                }
+            )
+
+    current_spending = [
+        {"name": category, "value": round(value, 2)}
+        for category, value in sorted(
+            category_spending.items(), key=lambda item: item[1], reverse=True
+        )
+    ]
+
+    return BudgetSnapshot(
+        monthly_income=monthly_income,
+        priority_categories=settings["priority_categories"],
+        recommendations=recommendations,
+        alerts=alerts,
+        current_spending=current_spending,
+    )
+
+
 def get_transactions(engine, user_id: int) -> pd.DataFrame:
     rows = execute_query(
         """
@@ -331,6 +597,18 @@ def update_transaction_category(
     return result.rowcount > 0
 
 
+def delete_transaction(engine, user_id: int, transaction_id: int) -> bool:
+    result = execute_write(
+        """
+        DELETE FROM transactions
+        WHERE user_id = :user_id AND id = :transaction_id
+        """,
+        {"user_id": user_id, "transaction_id": transaction_id},
+        engine=engine,
+    )
+    return result.rowcount > 0
+
+
 def search_transactions(
     engine,
     user_id: int,
@@ -340,6 +618,7 @@ def search_transactions(
     category_id: int | None = None,
     min_amount: float | None = None,
     max_amount: float | None = None,
+    source_type: str | None = None,
 ) -> pd.DataFrame:
     where_clauses = ["t.user_id = :user_id"]
     params: dict[str, Any] = {"user_id": user_id}
@@ -362,6 +641,9 @@ def search_transactions(
     if max_amount is not None:
         where_clauses.append("t.amount <= :max_amount")
         params["max_amount"] = max_amount
+    if source_type and source_type.lower() != "all":
+        where_clauses.append("COALESCE(uf.file_type, 'manual') = :source_type")
+        params["source_type"] = source_type
 
     rows = execute_query(
         f"""

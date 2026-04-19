@@ -27,6 +27,19 @@ class AuthResult:
     email_sent: bool = False
 
 
+def _ensure_user_profile_columns(engine=None) -> None:
+    """Best-effort schema compatibility for profile fields used by the UI."""
+    statements = [
+        "ALTER TABLE users ADD COLUMN name VARCHAR(255)",
+        "ALTER TABLE users ADD COLUMN role VARCHAR(50) DEFAULT 'user'",
+    ]
+    for statement in statements:
+        try:
+            execute_write(statement, engine=engine)
+        except Exception:  # noqa: BLE001
+            continue
+
+
 def normalize_email(email: str) -> str:
     return email.strip().lower()
 
@@ -70,8 +83,19 @@ def verify_password(password: str, stored_hash: str) -> bool:
 
 
 def get_user_by_email(email: str, engine=None) -> dict[str, Any] | None:
+    _ensure_user_profile_columns(engine=engine)
     return fetch_one(
-        "SELECT id, email, password_hash, created_at FROM users WHERE email = :email",
+        """
+        SELECT
+            id,
+            email,
+            password_hash,
+            COALESCE(name, '') AS name,
+            COALESCE(role, 'user') AS role,
+            created_at
+        FROM users
+        WHERE email = :email
+        """,
         {"email": normalize_email(email)},
         engine=engine,
     )
@@ -92,9 +116,12 @@ def register_user(
     engine,
     email: str,
     password: str,
+    full_name: str | None = None,
     confirmation_sender: ConfirmationSender | None = None,
 ) -> AuthResult:
+    _ensure_user_profile_columns(engine=engine)
     normalized_email = normalize_email(email)
+    normalized_name = (full_name or "").strip()
     if not normalized_email:
         return AuthResult(False, "Email is required.")
     if not password:
@@ -107,8 +134,16 @@ def register_user(
     password_hash = hash_password(password)
     try:
         execute_write(
-            "INSERT INTO users (email, password_hash) VALUES (:email, :password_hash)",
-            {"email": normalized_email, "password_hash": password_hash},
+            """
+            INSERT INTO users (email, password_hash, name, role)
+            VALUES (:email, :password_hash, :name, :role)
+            """,
+            {
+                "email": normalized_email,
+                "password_hash": password_hash,
+                "name": normalized_name,
+                "role": "user",
+            },
             engine=engine,
         )
     except IntegrityError:
