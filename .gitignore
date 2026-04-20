@@ -134,8 +134,9 @@ celerybeat.pid
 # SageMath parsed files
 *.sage.py
 
+.env
+.env.test
 # Environments
-#.env
 .envrc
 .venv
 env/

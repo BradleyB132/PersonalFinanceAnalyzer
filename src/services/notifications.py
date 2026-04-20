@@ -10,6 +10,11 @@ import smtplib
 
 logger = logging.getLogger(__name__)
 
+# Default logger usage notes:
+# - When SMTP is not configured we log an info-level preview so developers
+#   can see what would be sent without sending mail. The logger is used with
+#   structured 'extra' data so log aggregation systems can index recipient/subject.
+
 
 @dataclass(frozen=True)
 class EmailDeliveryResult:

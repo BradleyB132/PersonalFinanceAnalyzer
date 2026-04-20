@@ -43,6 +43,24 @@ Quickstart using Poetry:
    poetry run streamlit run src/app.py
    ```
 
+E2E tests (Playwright)
+-----------------------
+
+1. Install Playwright browsers and pytest plugin:
+
+   ```bash
+   poetry add --group dev pytest-playwright
+   poetry run playwright install
+   ```
+
+2. Run E2E tests with pytest:
+
+   ```bash
+   poetry run pytest tests/e2e -q
+   ```
+
+Note: Running Playwright tests requires the app to be running locally (default http://localhost:8501) and accessible to the browser instance. Use `E2E_BASE_URL` environment variable to change the address if needed.
+
 Notes:
 - The app uses SQLAlchemy `create_engine` to connect to the database using `DATABASE_URL`.
 - If you prefer not to use Poetry, you can still use a venv and `pip install -r requirements.txt`.

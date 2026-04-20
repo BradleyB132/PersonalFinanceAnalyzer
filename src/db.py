@@ -1,12 +1,34 @@
 """Database helper module for the Streamlit application."""
 
 from functools import lru_cache
+import logging
 import os
 
 from dotenv import load_dotenv
+import sentry_sdk
 from sqlalchemy import create_engine, text
 
+logger = logging.getLogger(__name__)
+
 load_dotenv()
+
+sentry_dsn = os.getenv("SENTRY_DSN")
+if sentry_dsn:
+    # Send INFO-level messages to Sentry as breadcrumbs, only send ERROR+ as events
+    sentry_logging = LoggingIntegration(level=logging.INFO, event_level=logging.ERROR)
+    sentry_sdk.init(
+        dsn=sentry_dsn,
+        integrations=[sentry_logging],
+        send_default_pii=False,
+        traces_sample_rate=float(os.getenv("SENTRY_TRACES_SAMPLE_RATE", "0.0")),
+        environment=os.getenv("SENTRY_ENV", "development"),
+        release=os.getenv("SENTRY_RELEASE"),
+        # enable_logs=True  # optionally enable if you want logging capture via SDK
+    )
+
+# If you still want to validate once, guard the crash behind an env var:
+if os.getenv("SENTRY_VALIDATE") == "1":
+    1 / 0
 
 
 def get_database_url() -> str:
@@ -18,7 +40,9 @@ def get_database_url() -> str:
 
 @lru_cache(maxsize=1)
 def get_engine():
-    return create_engine(get_database_url(), future=True)
+    engine = create_engine(get_database_url(), future=True)
+    logger.debug("Created SQLAlchemy engine for %s", get_database_url())
+    return engine
 
 
 def execute_query(query, params=None, engine=None):
