@@ -11,6 +11,16 @@ CREATE TABLE users (
     created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
 
+-- USER PREFERENCES
+CREATE TABLE user_preferences (
+    user_id INT PRIMARY KEY,
+    theme_mode VARCHAR(20) NOT NULL DEFAULT 'dark',
+    CONSTRAINT fk_user_preferences_user
+        FOREIGN KEY (user_id)
+        REFERENCES users(id)
+        ON DELETE CASCADE
+);
+
 -- CATEGORIES
 -- user_id NULL => system-defined category
 CREATE TABLE categories (

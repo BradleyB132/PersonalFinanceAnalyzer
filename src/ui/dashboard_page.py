@@ -24,6 +24,10 @@ from services.finance_service import (
     search_transactions,
     update_transaction_category,
 )
+from services.preferences_service import (
+    get_user_preferences,
+    save_user_preferences,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -34,6 +38,7 @@ NAVIGATION_OPTIONS = [
     "Transactions",
     "Search / Filter",
     "Reports",
+    "Preferences",
     "Budgeting",
 ]
 
@@ -44,6 +49,7 @@ NAV_ICONS = {
     "Transactions": "☰",
     "Search / Filter": "⌕",
     "Reports": "▤",
+    "Preferences": "⚙",
     "Budgeting": "$",
 }
 
@@ -54,12 +60,24 @@ NAV_DISPLAY = {
     "Transactions": "Transactions",
     "Search / Filter": "Search",
     "Reports": "Reports",
+    "Preferences": "Preferences",
     "Budgeting": "Budgeting",
 }
 
 
-def _resolve_theme_mode() -> str:
-    return "dark"
+def _resolve_theme_mode(engine) -> str:
+    if "theme_mode" in st.session_state:
+        return st.session_state.theme_mode
+
+    if st.session_state.authenticated_user is not None:
+        user_id = int(st.session_state.authenticated_user["id"])
+        preferences = get_user_preferences(engine, user_id)
+        theme_mode = preferences.get("theme_mode", "dark")
+    else:
+        theme_mode = "dark"
+
+    st.session_state.theme_mode = theme_mode
+    return theme_mode
 
 
 def _theme_tokens(theme_mode: str) -> dict[str, str]:
@@ -514,7 +532,7 @@ def _render_dashboard_overview(engine, user_id: int) -> None:
         unsafe_allow_html=True,
     )
 
-    theme_mode = _resolve_theme_mode()
+    theme_mode = _resolve_theme_mode(engine)
     metrics = get_dashboard_metrics(engine, user_id)
     _render_kpi_cards(metrics)
 
@@ -773,6 +791,27 @@ def _render_reports_section(engine, user_id: int) -> None:
     st.dataframe(transactions.head(10), use_container_width=True)
 
 
+def _render_preferences_section(engine, user_id: int) -> None:
+    st.title("Preferences")
+    st.write("Save your dashboard settings so the app matches your workflow.")
+
+    preferences = get_user_preferences(engine, user_id)
+    current_theme = preferences.get("theme_mode", "dark")
+    selected_theme = st.radio(
+        "Theme mode",
+        ["dark", "light"],
+        index=0 if current_theme == "dark" else 1,
+        horizontal=True,
+        key="preferences_theme_mode",
+    )
+
+    if st.button("Save preferences", type="primary"):
+        saved = save_user_preferences(engine, user_id, selected_theme)
+        st.session_state.theme_mode = saved["theme_mode"]
+        st.success("Preferences saved successfully.")
+        st.experimental_rerun()
+
+
 def _render_budgeting_section(engine, user_id: int) -> None:
     st.markdown(
         """
@@ -862,7 +901,7 @@ def _render_budgeting_section(engine, user_id: int) -> None:
             + ", ".join(overspent["category"].astype(str).tolist())
         )
 
-    theme_mode = _resolve_theme_mode()
+    theme_mode = _resolve_theme_mode(engine)
     left_col, right_col = st.columns([1.2, 1], gap="large")
     with left_col:
         viz_frame = recommendations[
@@ -928,7 +967,7 @@ def render_dashboard_page(engine, logout_callback) -> None:
         return
 
     initialize_dashboard_state()
-    theme_mode = _resolve_theme_mode()
+    theme_mode = _resolve_theme_mode(engine)
     _inject_dashboard_styles(theme_mode)
     _render_sidebar(user, logout_callback)
 
@@ -952,5 +991,7 @@ def render_dashboard_page(engine, logout_callback) -> None:
         _render_search_section(engine, int(user["id"]))
     elif section == "Reports":
         _render_reports_section(engine, int(user["id"]))
+    elif section == "Preferences":
+        _render_preferences_section(engine, int(user["id"]))
     elif section == "Budgeting":
         _render_budgeting_section(engine, int(user["id"]))
