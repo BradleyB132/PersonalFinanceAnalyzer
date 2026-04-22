@@ -23,6 +23,7 @@ from services.finance_service import (
     import_statement_file,
     search_transactions,
     update_transaction_category,
+    create_user_category,
 )
 from services.preferences_service import (
     get_user_preferences,
@@ -666,55 +667,60 @@ def _render_transactions_section(engine, user_id: int) -> None:
 
     st.dataframe(transactions, use_container_width=True)
 
-    transaction_labels = {
-        f"{row['id']} | {row['transaction_date']} | {str(row['description'])[:45]}": int(
-            row["id"]
-        )
-        for _, row in transactions.iterrows()
-    }
-    selected_label = st.selectbox(
-        "Select a transaction",
-        list(transaction_labels.keys()),
-        key="selected_transaction",
+    # Replace the previous dropdown with a simple numeric input where the
+    # user can type the transaction id directly. This is faster for power
+    # users and simpler to integrate with the "create new category" flow.
+    default_tx_id = int(transactions.iloc[0]["id"]) if not transactions.empty else 1
+    selected_transaction_id = st.number_input(
+        "Transaction ID",
+        min_value=1,
+        value=default_tx_id,
+        step=1,
+        key="selected_transaction_id",
     )
-    selected_transaction_id = transaction_labels[selected_label]
-    selected_transaction = get_transaction_by_id(
-        engine, user_id, selected_transaction_id
-    )
-    if selected_transaction is None:
-        st.error("Could not load the selected transaction.")
+
+    try:
+        selected_transaction_id = int(selected_transaction_id)
+    except Exception:
+        st.error("Transaction ID must be a whole number.")
         return
 
-    category_lookup = {
-        str(row["name"]): int(row["id"]) for _, row in categories.iterrows()
-    }
-    category_names = list(category_lookup.keys())
-    default_index = 0
-    current_category_id = int(selected_transaction["category_id"])
-    for index, name in enumerate(category_names):
-        if category_lookup[name] == current_category_id:
-            default_index = index
-            break
+    selected_transaction = get_transaction_by_id(engine, user_id, selected_transaction_id)
+    if selected_transaction is None:
+        st.error("Could not load the selected transaction. Ensure the ID exists.")
+        return
 
-    selected_category = st.selectbox(
-        "Update category",
-        category_names,
-        index=default_index,
-        key="transaction_category_update",
+    # Allow the user to type a new category name. If the typed name already
+    # exists for the user it will be reused; otherwise a new user-specific
+    # category will be created.
+    current_category_name = str(selected_transaction.get("category", ""))
+    new_category_name = st.text_input(
+        "Update category (type a new name to create)",
+        value=current_category_name,
+        key="transaction_category_new",
     )
 
     if st.button("Save category update", type="primary"):
-        updated = update_transaction_category(
-            engine,
-            user_id=user_id,
-            transaction_id=selected_transaction_id,
-            category_id=category_lookup[selected_category],
-        )
-        if updated:
-            st.success("Transaction category updated successfully.")
-            st.rerun()
+        cname = str(new_category_name or "").strip()
+        if not cname:
+            st.error("Category name must not be empty.")
         else:
-            st.error("Unable to update the selected transaction.")
+            try:
+                # Create or find user category and then apply to transactions.
+                category_id = create_user_category(engine, user_id, cname)
+                updated = update_transaction_category(
+                    engine,
+                    user_id=user_id,
+                    transaction_id=selected_transaction_id,
+                    category_id=category_id,
+                )
+                if updated:
+                    st.success("Transaction category updated successfully.")
+                    st.rerun()
+                else:
+                    st.error("Unable to update the selected transaction.")
+            except Exception as exc:
+                st.error(f"Failed to create or update category: {exc}")
 
 
 def _render_search_section(engine, user_id: int) -> None:

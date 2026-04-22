@@ -145,6 +145,43 @@ def get_available_categories(engine, user_id: int) -> pd.DataFrame:
     return pd.DataFrame(rows)
 
 
+def create_user_category(engine, user_id: int, name: str) -> int:
+    """Create a user-specific category if it does not exist and return its id.
+
+    If the category already exists for the user, return the existing id.
+
+    Complexity: O(1) to insert / fetch; DB enforces uniqueness per (name, user_id).
+    """
+    normalized = str(name).strip()
+    if not normalized:
+        raise ValueError("Category name must not be empty")
+
+    # Try to find existing category first
+    existing = fetch_one(
+        "SELECT id FROM categories WHERE name = :name AND user_id = :user_id",
+        {"name": normalized, "user_id": user_id},
+        engine=engine,
+    )
+    if existing is not None:
+        return int(existing["id"])
+
+    # Insert a new category for the user
+    execute_write(
+        "INSERT INTO categories (name, user_id) VALUES (:name, :user_id)",
+        {"name": normalized, "user_id": user_id},
+        engine=engine,
+    )
+
+    created = fetch_one(
+        "SELECT id FROM categories WHERE name = :name AND user_id = :user_id ORDER BY id DESC",
+        {"name": normalized, "user_id": user_id},
+        engine=engine,
+    )
+    if created is None:
+        raise RuntimeError("Unable to create category")
+    return int(created["id"])
+
+
 def ensure_uncategorized_category(engine) -> int:
     existing = fetch_one(
         "SELECT id FROM categories WHERE name = 'Uncategorized' AND user_id IS NULL",
