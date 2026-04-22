@@ -6,6 +6,7 @@ import os
 
 from dotenv import load_dotenv
 import sentry_sdk
+from sentry_sdk.integrations.logging import LoggingIntegration
 from sqlalchemy import create_engine, text
 
 logger = logging.getLogger(__name__)

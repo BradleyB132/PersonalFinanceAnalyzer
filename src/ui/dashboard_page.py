@@ -23,6 +23,8 @@ from services.finance_service import (
     import_statement_file,
     search_transactions,
     update_transaction_category,
+    build_category_summary_csv,
+    build_monthly_summary_csv,
 )
 
 logger = logging.getLogger(__name__)
@@ -753,6 +755,8 @@ def _render_reports_section(engine, user_id: int) -> None:
         return
 
     csv_bytes = build_transactions_csv(engine, user_id)
+    category_csv_bytes = build_category_summary_csv(engine, user_id)
+    monthly_csv_bytes = build_monthly_summary_csv(engine, user_id)
     pdf_bytes = build_pdf_report(engine, user_id)
 
     st.download_button(
@@ -761,6 +765,18 @@ def _render_reports_section(engine, user_id: int) -> None:
         file_name="personal_finance_report.csv",
         mime="text/csv",
         type="primary",
+    )
+    st.download_button(
+        "Download category summary CSV",
+        data=category_csv_bytes,
+        file_name="category_summary.csv",
+        mime="text/csv",
+    )
+    st.download_button(
+        "Download monthly trend CSV",
+        data=monthly_csv_bytes,
+        file_name="monthly_trend_summary.csv",
+        mime="text/csv",
     )
     st.download_button(
         "Download PDF snapshot",
