@@ -109,6 +109,16 @@ def finance_engine():
         )
         connection.execute(
             text(
+                """
+                CREATE TABLE user_preferences (
+                    user_id INTEGER PRIMARY KEY,
+                    theme_mode TEXT NOT NULL DEFAULT 'dark'
+                )
+                """
+            )
+        )
+        connection.execute(
+            text(
                 "INSERT INTO users (id, email, password_hash) VALUES (1, 'user@example.com', 'hash')"
             )
         )
