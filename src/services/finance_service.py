@@ -187,16 +187,16 @@ def seed_default_categories(engine) -> None:
         "Education",
     ]
 
-    # Check if categories already exist
-    existing_count = execute_query(
-        "SELECT COUNT(*) as count FROM categories WHERE user_id IS NULL",
+    # Check if all categories already exist
+    existing_names = execute_query(
+        "SELECT name FROM categories WHERE user_id IS NULL",
         engine=engine,
     )
-    if existing_count and int(existing_count[0]["count"]) > 0:
-        return  # Categories already seeded
+    existing_set = {row["name"] for row in existing_names}
+    needed_set = set(system_categories)
 
-    # Insert all system categories
-    for category_name in system_categories:
+    # Only insert missing categories
+    for category_name in needed_set - existing_set:
         execute_write(
             "INSERT INTO categories (name, user_id) VALUES (:name, NULL)",
             {"name": category_name},
