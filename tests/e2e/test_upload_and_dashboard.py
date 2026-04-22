@@ -49,7 +49,9 @@ def _write_fixture_csv(path: Path, rows: list[dict]) -> None:
     frame.to_csv(path, index=False)
 
 
-def test_upload_bank_statement_and_view_dashboard(page: Page, base_url: str, tmp_path: Path):
+def test_upload_bank_statement_and_view_dashboard(
+    page: Page, base_url: str, tmp_path: Path
+):
     """E2E: Upload a small bank statement CSV and assert dashboard shows data.
 
     Steps:
@@ -77,9 +79,9 @@ def test_upload_bank_statement_and_view_dashboard(page: Page, base_url: str, tmp
     # If app shows Register/Login, register and login programmatically via UI
     # For brevity we assume a simple flow: if "Sign in" exists, it's login page
     if page.locator("text=Sign in").count() > 0:
-        page.fill('input[placeholder="you@example.com"]', 'e2e_user@example.com')
-        page.fill('input[type="password"]', 'Password123!')
-        page.click('text=Sign in')
+        page.fill('input[placeholder="you@example.com"]', "e2e_user@example.com")
+        page.fill('input[type="password"]', "Password123!")
+        page.click("text=Sign in")
         time.sleep(0.5)
 
     # After login, the dashboard should be visible. Use the sidebar upload control
@@ -92,16 +94,18 @@ def test_upload_bank_statement_and_view_dashboard(page: Page, base_url: str, tmp
     time.sleep(0.2)
 
     # Click the "Process Upload" button in the main area
-    page.click('text=Process Upload')
+    page.click("text=Process Upload")
     time.sleep(1.5)
 
     # Assert that the dashboard now displays a transaction table containing
     # "Whole Foods Market". We search the page content for that text.
-    assert page.locator('text=Whole Foods Market').count() > 0
-    assert page.locator('text=Train Ticket').count() > 0
+    assert page.locator("text=Whole Foods Market").count() > 0
+    assert page.locator("text=Train Ticket").count() > 0
 
 
-def test_upload_credit_card_statement_and_combined_view(page: Page, base_url: str, tmp_path: Path):
+def test_upload_credit_card_statement_and_combined_view(
+    page: Page, base_url: str, tmp_path: Path
+):
     """E2E: Upload credit card CSV and assert combined transactions view.
 
     This covers ACs in docs/stories/user_story_&_ACs_2.md.
@@ -110,8 +114,18 @@ def test_upload_credit_card_statement_and_combined_view(page: Page, base_url: st
     _write_fixture_csv(
         csv_file,
         [
-            {"posted date": "2024-02-01", "merchant": "Uber Trip", "debit": "27.45", "credit": "0"},
-            {"posted date": "2024-02-02", "merchant": "Card Payment", "debit": "0", "credit": "150.00"},
+            {
+                "posted date": "2024-02-01",
+                "merchant": "Uber Trip",
+                "debit": "27.45",
+                "credit": "0",
+            },
+            {
+                "posted date": "2024-02-02",
+                "merchant": "Card Payment",
+                "debit": "0",
+                "credit": "150.00",
+            },
         ],
     )
 
@@ -123,9 +137,9 @@ def test_upload_credit_card_statement_and_combined_view(page: Page, base_url: st
     assert upload.count() > 0
     upload.set_input_files(str(csv_file))
     time.sleep(0.2)
-    page.click('text=Process Upload')
+    page.click("text=Process Upload")
     time.sleep(1.5)
 
     # The combined view should now include both the bank and card transactions
-    assert page.locator('text=Uber Trip').count() > 0
-    assert page.locator('text=Card Payment').count() > 0
+    assert page.locator("text=Uber Trip").count() > 0
+    assert page.locator("text=Card Payment").count() > 0

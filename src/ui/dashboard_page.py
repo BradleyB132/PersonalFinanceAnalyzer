@@ -659,7 +659,6 @@ def _render_transactions_section(engine, user_id: int) -> None:
     st.write("Review transactions and update misclassified categories.")
 
     transactions = get_transactions(engine, user_id)
-    categories = get_available_categories(engine, user_id)
 
     if transactions.empty:
         _render_empty_dashboard_prompt()
@@ -685,7 +684,9 @@ def _render_transactions_section(engine, user_id: int) -> None:
         st.error("Transaction ID must be a whole number.")
         return
 
-    selected_transaction = get_transaction_by_id(engine, user_id, selected_transaction_id)
+    selected_transaction = get_transaction_by_id(
+        engine, user_id, selected_transaction_id
+    )
     if selected_transaction is None:
         st.error("Could not load the selected transaction. Ensure the ID exists.")
         return

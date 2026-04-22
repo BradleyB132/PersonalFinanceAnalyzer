@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from db import execute_query, execute_write, fetch_one
+from db import execute_write, fetch_one
 
 VALID_THEME_MODES = {"dark", "light"}
 
