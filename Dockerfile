@@ -4,9 +4,9 @@
 # Start from an official Python image.
 # "slim" is a minimal variant — it has Python but strips out
 # many OS packages that we don't need, keeping the image small.
-# Always pin to a specific version (3.11-slim, not just "python")
+# Always pin to a specific version (3.12-slim, not just "python")
 # so the build is reproducible and won't break on a future update.
-FROM python:3.11-slim
+FROM python:3.12-slim
 
 # ─────────────────────────────────────────────
 # Install Poetry
@@ -51,7 +51,7 @@ COPY pyproject.toml poetry.lock ./
 # --no-interaction --no-ansi
 #   Disable prompts and colored output — appropriate for automated builds.
 RUN poetry config virtualenvs.create false \
-    && poetry install --only main --no-interaction --no-ansi –no-root
+    && poetry install --only main --no-interaction --no-ansi --no-root
 
 # ─────────────────────────────────────────────
 # Copy Application Source Code
@@ -63,22 +63,24 @@ RUN poetry config virtualenvs.create false \
 COPY . .
 
 # ─────────────────────────────────────────────
-# Expose Port
+# Make entrypoint script executable
+# ─────────────────────────────────────────────
+RUN chmod +x entrypoint.sh
+
+# ─────────────────────────────────────────────
+# Expose Ports
 # ─────────────────────────────────────────────
 # Streamlit listens on port 8501 by default.
+# Health check server listens on port 8502.
 # EXPOSE documents this for other developers and for Docker networking.
 # Note: EXPOSE alone does not publish the port to the host machine —
 # that requires -p 8501:8501 when running the container locally.
-EXPOSE 8501
+EXPOSE 8501 8502
 
 # ─────────────────────────────────────────────
 # Start Command
 # ─────────────────────────────────────────────
 # This is the command Docker runs when the container starts.
-# We launch Streamlit and explicitly set:
-#   --server.port=8501   match the port we declared above
-#   --server.address=0.0.0.0   listen on all network interfaces,
-#                               not just localhost — required so that
-#                               traffic from outside the container can reach it.
-CMD ["streamlit", "run", "app.py", "--server.port=8501", "--server.address=0.0.0.0"]
+# We use an entrypoint script that runs both Streamlit and the health check server.
+ENTRYPOINT ["./entrypoint.sh"]
 
