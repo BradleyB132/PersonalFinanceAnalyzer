@@ -496,6 +496,20 @@ def build_transactions_csv(engine, user_id: int) -> bytes:
     return frame.to_csv(index=False).encode("utf-8")
 
 
+def build_category_summary_csv(engine, user_id: int) -> bytes:
+    frame = get_category_summary(engine, user_id)
+    if frame.empty:
+        frame = pd.DataFrame(columns=["category", "amount"])
+    return frame.to_csv(index=False).encode("utf-8")
+
+
+def build_monthly_summary_csv(engine, user_id: int) -> bytes:
+    frame = get_trend_summary(engine, user_id)
+    if frame.empty:
+        frame = pd.DataFrame(columns=["period", "amount"])
+    return frame.to_csv(index=False).encode("utf-8")
+
+
 def build_pdf_report(engine, user_id: int) -> bytes:
     metrics = get_dashboard_metrics(engine, user_id)
     category_summary = get_category_summary(engine, user_id)
