@@ -49,7 +49,44 @@ def _write_fixture_csv(path: Path, rows: list[dict]) -> None:
     frame.to_csv(path, index=False)
 
 
-def test_upload_bank_statement_and_view_dashboard(page: Page, base_url: str, tmp_path: Path, e2e_test_user: dict):
+def _login(page: Page, base_url: str, email: str, password: str) -> None:
+    page.goto(base_url)
+    time.sleep(1.0)
+
+    page.fill('input[placeholder="you@example.com"]', email)
+    page.fill('input[placeholder="Enter your password"]', password)
+    page.click('button[type="submit"]')
+    time.sleep(2.0)
+
+    assert page.locator('text=Personal Finance Command Center').count() > 0
+
+
+def _upload_csv(
+    page: Page,
+    nav_label: str,
+    csv_path: Path,
+    expected_texts: list[str] | None = None,
+) -> None:
+    page.click(f'text={nav_label}')
+    time.sleep(0.5)
+
+    upload = page.locator('input[type="file"]')
+    assert upload.count() > 0, "Upload control not found"
+    upload.set_input_files(str(csv_path))
+    time.sleep(0.5)
+
+    process_button = page.locator('text=Process Upload')
+    assert process_button.count() > 0, "Process Upload button not found"
+    process_button.click()
+    time.sleep(2.0)
+
+    for expected_text in expected_texts or []:
+        assert page.locator(f"text={expected_text}").count() > 0
+
+
+def test_upload_bank_statement_and_view_dashboard(
+    page: Page, base_url: str, tmp_path: Path, e2e_test_user: dict
+):
     """E2E: Upload a small bank statement CSV and assert dashboard shows data.
 
     Steps:
@@ -70,49 +107,13 @@ def test_upload_bank_statement_and_view_dashboard(page: Page, base_url: str, tmp
         ],
     )
 
-    # Navigate to the app
-    page.goto(base_url)
-    time.sleep(1.0)
-
-    # Register new user
-    if page.locator("text=Sign in to Dashboard").count() > 0:
-        # Switch to register tab if available
-        register_tabs = page.locator('button:has-text("Register")')
-        if register_tabs.count() > 0:
-            register_tabs.click()
-            time.sleep(0.5)
-
-        # Fill registration form
-        page.fill('input[placeholder="you@example.com"]', e2e_test_user["email"])
-        page.fill('input[placeholder="Enter password"]', e2e_test_user["password"])
-        page.fill('input[placeholder="Confirm password"]', e2e_test_user["password"])
-
-        # Submit registration
-        page.click('button[type="submit"]:has-text("Register")')
-        time.sleep(2.0)
-
-        # Should redirect to dashboard after registration
-        assert page.locator('text=Personal Finance Command Center').count() > 0
-
-    # If already logged in or registration not needed, proceed with upload
-    # Navigate to upload section if not already there
-    if page.locator('text=Upload Bank').count() > 0:
-        page.click('text=Upload Bank')
-        time.sleep(0.5)
-
-    # Use the file upload control
-    upload = page.locator('input[type="file"]')
-    assert upload.count() > 0, "Upload control not found"
-
-    # Upload the CSV file
-    upload.set_input_files(str(csv_file))
-    time.sleep(0.5)
-
-    # Click the "Process Upload" button
-    process_button = page.locator('text=Process Upload')
-    assert process_button.count() > 0, "Process Upload button not found"
-    process_button.click()
-    time.sleep(2.0)
+    _login(page, base_url, e2e_test_user["email"], e2e_test_user["password"])
+    _upload_csv(
+        page,
+        "Upload Bank",
+        csv_file,
+        expected_texts=["Whole Foods Market", "Train Ticket"],
+    )
 
     # Verify dashboard shows the uploaded transactions
     assert page.locator('text=Whole Foods Market').count() > 0, "Transaction not found in dashboard"
@@ -122,7 +123,9 @@ def test_upload_bank_statement_and_view_dashboard(page: Page, base_url: str, tmp
     assert page.locator('text=Transactions').count() > 0, "Transaction count not updated"
 
 
-def test_upload_credit_card_statement_and_combined_view(page: Page, base_url: str, tmp_path: Path, e2e_test_user: dict):
+def test_upload_credit_card_statement_and_combined_view(
+    page: Page, base_url: str, tmp_path: Path, e2e_test_user: dict
+):
     """E2E: Upload credit card CSV and assert combined transactions view.
 
     This covers ACs in docs/stories/user_story_&_ACs_2.md.
@@ -136,42 +139,32 @@ def test_upload_credit_card_statement_and_combined_view(page: Page, base_url: st
         ],
     )
 
-    page.goto(base_url)
-    time.sleep(1.0)
+    bank_csv = tmp_path / "bank_statement.csv"
+    _write_fixture_csv(
+        bank_csv,
+        [
+            {"date": "2024-01-03", "details": "Whole Foods Market", "amount": -42.15},
+            {"date": "2024-01-05", "details": "Train Ticket", "amount": -18.5},
+        ],
+    )
 
-    # Login with test user (assuming user is registered from previous test)
-    if page.locator("text=Sign in to Dashboard").count() > 0:
-        page.fill('input[placeholder="you@example.com"]', e2e_test_user["email"])
-        page.fill('input[type="password"]', e2e_test_user["password"])
-        page.click('text=Sign in')
-        time.sleep(2.0)
-
-    # Navigate to credit card upload
-    if page.locator('text=Upload Card').count() > 0:
-        page.click('text=Upload Card')
-        time.sleep(0.5)
-
-    # Upload the credit card CSV
-    upload = page.locator('input[type="file"]')
-    assert upload.count() > 0, "Upload control not found"
-    upload.set_input_files(str(csv_file))
-    time.sleep(0.5)
-
-    # Process the upload
-    process_button = page.locator('text=Process Upload')
-    assert process_button.count() > 0, "Process Upload button not found"
-    process_button.click()
-    time.sleep(2.0)
+    _login(page, base_url, e2e_test_user["email"], e2e_test_user["password"])
+    _upload_csv(page, "Upload Bank", bank_csv)
+    _upload_csv(
+        page,
+        "Upload Card",
+        csv_file,
+        expected_texts=["Uber Trip", "Card Payment"],
+    )
 
     # Verify both bank and card transactions are visible
     assert page.locator('text=Uber Trip').count() > 0, "Credit card transaction not found"
     assert page.locator('text=Card Payment').count() > 0, "Credit card transaction not found"
 
 
-def test_dashboard_overview_display(page: Page, base_url: str):
+def test_dashboard_overview_display(page: Page, base_url: str, e2e_test_user: dict):
     """E2E: Test that dashboard overview shows key metrics and charts."""
-    page.goto(base_url)
-    time.sleep(0.5)
+    _login(page, base_url, e2e_test_user["email"], e2e_test_user["password"])
 
     # Should show key metrics cards
     assert page.locator('text=Transactions').count() > 0
@@ -184,10 +177,21 @@ def test_dashboard_overview_display(page: Page, base_url: str):
     assert page.locator('text=Category Mix').count() > 0
 
 
-def test_search_and_filter_functionality(page: Page, base_url: str):
+def test_search_and_filter_functionality(
+    page: Page, base_url: str, tmp_path: Path, e2e_test_user: dict
+):
     """E2E: Test search and filter transactions functionality."""
-    page.goto(base_url)
-    time.sleep(0.5)
+    csv_file = tmp_path / "search_statement.csv"
+    _write_fixture_csv(
+        csv_file,
+        [
+            {"date": "2024-03-01", "details": "Netflix", "amount": -19.99},
+            {"date": "2024-03-03", "details": "Uber Trip", "amount": -24.50},
+        ],
+    )
+
+    _login(page, base_url, e2e_test_user["email"], e2e_test_user["password"])
+    _upload_csv(page, "Upload Bank", csv_file)
 
     # Navigate to Search section
     page.click('text=Search')
@@ -197,16 +201,24 @@ def test_search_and_filter_functionality(page: Page, base_url: str):
     assert page.locator('text=Find transactions by keyword').count() > 0
     assert page.locator('input[placeholder="Walmart, Uber, Netflix"]').count() > 0
 
-    # Test empty search shows proper message
+    page.fill('input[placeholder="Walmart, Uber, Netflix"]', 'Uber')
     page.click('text=Apply filters')
-    time.sleep(0.5)
-    assert page.locator('text=Run a search to see matching transactions').count() > 0
+    time.sleep(1.0)
+    assert page.locator('text=Uber Trip').count() > 0
 
 
-def test_reports_export_functionality(page: Page, base_url: str):
+def test_reports_export_functionality(
+    page: Page, base_url: str, tmp_path: Path, e2e_test_user: dict
+):
     """E2E: Test reports and export functionality."""
-    page.goto(base_url)
-    time.sleep(0.5)
+    csv_file = tmp_path / "reports_statement.csv"
+    _write_fixture_csv(
+        csv_file,
+        [{"date": "2024-03-07", "details": "Coffee Shop", "amount": -8.25}],
+    )
+
+    _login(page, base_url, e2e_test_user["email"], e2e_test_user["password"])
+    _upload_csv(page, "Upload Bank", csv_file)
 
     # Navigate to Reports section
     page.click('text=Reports')
@@ -217,10 +229,9 @@ def test_reports_export_functionality(page: Page, base_url: str):
     assert page.locator('text=Download PDF snapshot').count() > 0
 
 
-def test_budget_planner_interface(page: Page, base_url: str):
+def test_budget_planner_interface(page: Page, base_url: str, e2e_test_user: dict):
     """E2E: Test budget planner interface loads correctly."""
-    page.goto(base_url)
-    time.sleep(0.5)
+    _login(page, base_url, e2e_test_user["email"], e2e_test_user["password"])
 
     # Navigate to Budgeting section
     page.click('text=Budgeting')
@@ -232,13 +243,16 @@ def test_budget_planner_interface(page: Page, base_url: str):
     assert page.locator('text=Priority categories').count() > 0
 
 
-def test_error_handling_invalid_file(page: Page, base_url: str, tmp_path: Path):
+def test_error_handling_invalid_file(
+    page: Page, base_url: str, tmp_path: Path, e2e_test_user: dict
+):
     """E2E: Test error handling for invalid file uploads."""
     # Create an invalid CSV file
     invalid_csv = tmp_path / "invalid.csv"
     invalid_csv.write_text("invalid,csv,data\n1,2,3")
 
-    page.goto(base_url)
+    _login(page, base_url, e2e_test_user["email"], e2e_test_user["password"])
+    page.click('text=Upload Bank')
     time.sleep(0.5)
 
     # Try to upload invalid file
