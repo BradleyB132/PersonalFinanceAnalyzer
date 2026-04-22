@@ -167,6 +167,43 @@ def ensure_uncategorized_category(engine) -> int:
     return int(created["id"])
 
 
+def seed_default_categories(engine) -> None:
+    """Initialize system-level categories if they don't exist."""
+    system_categories = [
+        "Uncategorized",
+        "Groceries",
+        "Dining",
+        "Transportation",
+        "Utilities",
+        "Rent",
+        "Entertainment",
+        "Shopping",
+        "Healthcare",
+        "Travel",
+        "Subscriptions",
+        "Income",
+        "Insurance",
+        "Savings",
+        "Education",
+    ]
+
+    # Check if categories already exist
+    existing_count = execute_query(
+        "SELECT COUNT(*) as count FROM categories WHERE user_id IS NULL",
+        engine=engine,
+    )
+    if existing_count and int(existing_count[0]["count"]) > 0:
+        return  # Categories already seeded
+
+    # Insert all system categories
+    for category_name in system_categories:
+        execute_write(
+            "INSERT INTO categories (name, user_id) VALUES (:name, NULL)",
+            {"name": category_name},
+            engine=engine,
+        )
+
+
 def get_rules(engine, user_id: int) -> list[dict[str, Any]]:
     return execute_query(
         """
@@ -510,7 +547,13 @@ def build_pdf_report(engine, user_id: int) -> bytes:
         from reportlab.lib import colors
         from reportlab.lib.pagesizes import letter
         from reportlab.lib.styles import getSampleStyleSheet
-        from reportlab.platypus import Paragraph, SimpleDocTemplate, Spacer, Table, TableStyle
+        from reportlab.platypus import (
+            Paragraph,
+            SimpleDocTemplate,
+            Spacer,
+            Table,
+            TableStyle,
+        )
     except Exception as exc:  # pragma: no cover - runtime import error
         raise RuntimeError(
             "ReportLab library is required to build PDF reports. Install 'reportlab'"
@@ -686,9 +729,11 @@ def calculate_budget_recommendations(
     window_start = first_ts if first_ts > one_year_before else one_year_before
 
     # Define months used inclusive: e.g., Jan to Mar -> 3 months
-    months_used = (last_ts.year - window_start.year) * 12 + (
-        last_ts.month - window_start.month
-    ) + 1
+    months_used = (
+        (last_ts.year - window_start.year) * 12
+        + (last_ts.month - window_start.month)
+        + 1
+    )
     if months_used <= 0:
         months_used = 1
 
@@ -718,8 +763,12 @@ def calculate_budget_recommendations(
     )
 
     # Convert to numeric and take absolute spend basis (treat outflows as positive)
-    category_totals["amount"] = pd.to_numeric(category_totals["amount"], errors="coerce").fillna(0.0)
-    category_totals["spend_basis"] = category_totals["amount"].abs() / float(months_used)
+    category_totals["amount"] = pd.to_numeric(
+        category_totals["amount"], errors="coerce"
+    ).fillna(0.0)
+    category_totals["spend_basis"] = category_totals["amount"].abs() / float(
+        months_used
+    )
 
     # Get available categories list so we include categories with zero spend
     categories = get_available_categories(engine, user_id)
@@ -737,8 +786,12 @@ def calculate_budget_recommendations(
         )
 
     merged = categories[["id", "name"]].rename(columns={"name": "category"}).copy()
-    merged = merged.merge(category_totals[["category", "spend_basis"]], on="category", how="left")
-    merged["spend_basis"] = pd.to_numeric(merged["spend_basis"], errors="coerce").fillna(0.0)
+    merged = merged.merge(
+        category_totals[["category", "spend_basis"]], on="category", how="left"
+    )
+    merged["spend_basis"] = pd.to_numeric(
+        merged["spend_basis"], errors="coerce"
+    ).fillna(0.0)
 
     # Compute weights proportional to historical spend (monthly average)
     spend_total = float(merged["spend_basis"].sum())

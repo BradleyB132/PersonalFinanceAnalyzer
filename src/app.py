@@ -14,6 +14,7 @@ import logging_config  # noqa: F401 - module side-effects only
 
 from db import get_engine
 from ui.auth_page import render_auth_page
+from services.finance_service import seed_default_categories
 
 logger = logging.getLogger(__name__)
 
@@ -39,6 +40,13 @@ def main() -> None:
         logger.exception("Failed to obtain database engine")
         st.error(f"Database connection error: {exc}")
         st.stop()
+
+    # Initialize default categories on first run
+    try:
+        seed_default_categories(engine)
+    except Exception as exc:
+        logger.exception("Failed to seed default categories")
+        st.warning(f"Could not initialize categories: {exc}")
 
     logger.info("Starting PersonalFinanceAnalyzer Streamlit app")
     render_auth_page(engine)

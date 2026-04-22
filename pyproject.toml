@@ -26,6 +26,10 @@ python-dotenv = "^1.2.2"
 pandas = "^3.0.2"
 reportlab = "^4.2.5"
 sentry-sdk = "^2.58.0"
+bcrypt = "^5.0.0"
+pdfplumber = "^0.11.9"
+plotly = "^6.7.0"
+pyjwt = "^2.12.1"
 
 [tool.poetry.group.dev.dependencies]
 pytest = "^8.4.2"
