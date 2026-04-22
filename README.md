@@ -15,7 +15,23 @@ Architecture and stack decisions are documented in:
 - [docs/adr.md](docs/adr.md)
 - [docs/techstack.md](docs/techstack.md)
 
-## How To Build
+## How To Run
+
+### 🚀 Quick Start (Docker Compose - Recommended)
+
+```bash
+# Clone and setup
+git clone https://github.com/BradleyB132/PersonalFinanceAnalyzer.git
+cd PersonalFinanceAnalyzer
+cp .env.example .env
+
+# Start the app and database
+docker-compose up --build
+```
+
+Then open http://localhost:8501
+
+### 🐍 Alternative: Poetry Setup
 
 Install dependencies with Poetry:
 

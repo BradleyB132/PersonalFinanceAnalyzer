@@ -1,4 +1,51 @@
-# Running PersonalFinanceAnalyzer (using Poetry)
+# Running PersonalFinanceAnalyzer
+
+## 🚀 Quick Start with Docker Compose (Recommended)
+
+The easiest way to get started is using Docker Compose, which sets up PostgreSQL and the app automatically.
+
+### Prerequisites:
+- Docker and Docker Compose
+- Git
+
+### Quickstart:
+
+1. **Clone the repository:**
+   ```bash
+   git clone https://github.com/BradleyB132/PersonalFinanceAnalyzer.git
+   cd PersonalFinanceAnalyzer
+   ```
+
+2. **Copy environment file:**
+   ```bash
+   cp .env.example .env
+   ```
+
+3. **Start the application:**
+   ```bash
+   docker-compose up --build
+   ```
+
+4. **Open your browser:**
+   - App: http://localhost:8501
+   - Database: localhost:5432 (postgres/postgres)
+
+### Development with Hot Reload:
+
+```bash
+# Start services in background
+docker-compose up -d
+
+# View logs
+docker-compose logs -f app
+
+# Stop services
+docker-compose down
+```
+
+---
+
+## 🐍 Alternative: Running with Poetry
 
 Prerequisites:
 - Python 3.9+
