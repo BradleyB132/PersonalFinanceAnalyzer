@@ -774,6 +774,7 @@ def calculate_budget_recommendations(
         )
 
     merged = categories[["id", "name"]].rename(columns={"name": "category"}).copy()
+    merged = merged.drop_duplicates(subset=["category"])
     merged = merged.merge(category_totals[["category", "spend_basis"]], on="category", how="left")
     merged["spend_basis"] = pd.to_numeric(merged["spend_basis"], errors="coerce").fillna(0.0)
 
