@@ -5,6 +5,8 @@ from io import BytesIO
 import pandas as pd
 
 from services.finance_service import (
+    build_category_summary_csv,
+    build_monthly_summary_csv,
     build_pdf_report,
     build_transactions_csv,
     calculate_budget_recommendations,
@@ -94,8 +96,12 @@ def test_search_update_and_exports(finance_engine) -> None:
     assert updated_row["category"] == "Travel"
 
     csv_bytes = build_transactions_csv(finance_engine, 1)
+    category_csv_bytes = build_category_summary_csv(finance_engine, 1)
+    monthly_csv_bytes = build_monthly_summary_csv(finance_engine, 1)
     pdf_bytes = build_pdf_report(finance_engine, 1)
     assert len(csv_bytes) > 20
+    assert b"category" in category_csv_bytes.lower()
+    assert b"period" in monthly_csv_bytes.lower()
     assert pdf_bytes.startswith(b"%PDF")
 
 
