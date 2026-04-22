@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import os
 import sys
 from pathlib import Path
 
@@ -131,3 +132,58 @@ def finance_engine():
             )
         )
     return engine
+
+
+# E2E Test Fixtures
+
+@pytest.fixture(scope="session")
+def e2e_database_url():
+    """Return database URL for E2E tests. Uses environment variable or defaults to local."""
+    return os.getenv("DATABASE_URL", "postgresql://postgres:postgres@localhost:5432/personalfinanceanalyzer")
+
+
+@pytest.fixture(scope="function")
+def e2e_test_user(e2e_database_url):
+    """Create a unique test user for E2E tests and clean up after."""
+    import uuid
+    from sqlalchemy import create_engine, text
+
+    test_email = f"e2e_test_{uuid.uuid4().hex[:8]}@example.com"
+    test_password = "TestPassword123!"
+
+    engine = create_engine(e2e_database_url)
+
+    # Create test user
+    with engine.begin() as connection:
+        # Hash password using the app's method
+        from services.auth_service import hash_password
+        password_hash = hash_password(test_password)
+
+        connection.execute(
+            text(
+                "INSERT INTO users (email, password_hash) VALUES (:email, :password_hash)"
+            ),
+            {"email": test_email, "password_hash": password_hash}
+        )
+
+        # Get user ID
+        result = connection.execute(
+            text("SELECT id FROM users WHERE email = :email"),
+            {"email": test_email}
+        )
+        user_id = result.fetchone()[0]
+
+    yield {
+        "email": test_email,
+        "password": test_password,
+        "user_id": user_id
+    }
+
+    # Cleanup: Delete test user and all associated data
+    with engine.begin() as connection:
+        # Delete in correct order due to foreign keys
+        connection.execute(text("DELETE FROM transactions WHERE user_id = :user_id"), {"user_id": user_id})
+        connection.execute(text("DELETE FROM uploaded_files WHERE user_id = :user_id"), {"user_id": user_id})
+        connection.execute(text("DELETE FROM description_rules WHERE user_id = :user_id"), {"user_id": user_id})
+        connection.execute(text("DELETE FROM categories WHERE user_id = :user_id"), {"user_id": user_id})
+        connection.execute(text("DELETE FROM users WHERE id = :user_id"), {"user_id": user_id})
