@@ -16,6 +16,7 @@ name = "personalfinanceanalyzer"
 version = "0.1.0"
 description = "Personal Finance Analyzer - minimal Streamlit app"
 authors = ["Bradley Brenning <Brenbra132@gmail.com>"]
+package-mode = false
 
 [tool.poetry.dependencies]
 python = ">=3.12,<4"
