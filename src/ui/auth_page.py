@@ -9,7 +9,11 @@ import streamlit as st
 from services.auth_service import authenticate_user, register_user
 from services.auth_service import get_user_by_email
 from services.notifications import send_confirmation_email
-from services.validation_service import validate_email, validate_password
+from services.validation_service import (
+    MIN_PASSWORD_LENGTH,
+    validate_email,
+    validate_password,
+)
 from ui.dashboard_page import render_dashboard_page
 
 logger = logging.getLogger(__name__)
@@ -360,7 +364,7 @@ def render_register_form(engine) -> None:
             return
         if not validate_password(password):
             st.error(
-                f"Password must be at least {8} characters long."
+                f"Password must be at least {MIN_PASSWORD_LENGTH} characters long."
             )
             return
         if password != confirm_password:

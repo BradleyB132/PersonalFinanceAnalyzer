@@ -12,7 +12,11 @@ from typing import Any, Callable
 from sqlalchemy.exc import IntegrityError
 
 from db import execute_write, fetch_one
-from services.validation_service import validate_email, validate_password
+from services.validation_service import (
+    MIN_PASSWORD_LENGTH,
+    validate_email,
+    validate_password,
+)
 import logging
 
 logger = logging.getLogger(__name__)
