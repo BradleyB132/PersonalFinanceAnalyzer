@@ -1,14 +1,15 @@
 # PersonalFinanceAnalyzer
 
-PersonalFinanceAnalyzer is a Streamlit web application for personal finance tracking. The current implementation on the `login` branch provides a working registration and login flow backed by the existing `users` table in `db/schema.sql`.
+PersonalFinanceAnalyzer is a Streamlit web application for personal finance tracking. The current implementation includes authentication, transaction import, dashboard reporting, and a Docker Compose setup backed by PostgreSQL.
 
 ## Project Description
 
-The application is being built incrementally around the documented user stories and acceptance criteria. Current auth functionality includes:
-- user registration
-- login with email and password
+The application is being built incrementally around the documented user stories and acceptance criteria. Current functionality includes:
+- user registration and login
 - duplicate-email rejection
-- logout and return to the homepage/dashboard entry state
+- logout and return to the dashboard entry state
+- transaction import and categorization
+- dashboard summaries and reporting
 - confirmation email delivery hook via SMTP configuration
 
 Architecture and stack decisions are documented in:
@@ -17,7 +18,7 @@ Architecture and stack decisions are documented in:
 
 ## How To Run
 
-### 🚀 Quick Start (Docker Compose - Recommended)
+### Quick Start (Docker Compose - Recommended)
 
 ```bash
 # Clone and setup
@@ -26,12 +27,12 @@ cd PersonalFinanceAnalyzer
 cp .env.example .env
 
 # Start the app and database
-docker-compose up --build
+docker compose up --build
 ```
 
 Then open http://localhost:8501
 
-### 🐍 Alternative: Poetry Setup
+### Alternative: Poetry Setup
 
 Install dependencies with Poetry:
 
@@ -39,13 +40,11 @@ Install dependencies with Poetry:
 poetry install
 ```
 
-If you need to refresh the database environment, start the included Postgres service:
+If you need to start the included Postgres service only:
 
 ```bash
-docker compose up -d db-dev
+docker compose up -d db
 ```
-
-## How To Run
 
 Start the Streamlit app:
 
@@ -95,13 +94,13 @@ Welcome to PersonalFinanceAnalyzer, user@example.com! Your account has been crea
 ## Requirement Coverage
 
 Implemented in this branch:
-- user stories and acceptance criteria for authentication
+- user authentication flows
+- transaction import and dashboard reporting
 - architecture decision record and tech stack record
-- unit, integration, and end-to-end style tests for auth logic
+- unit, integration, and end-to-end style tests
 - logging setup
 - GitHub CI, Dependabot, and code security scanning workflow files
 - PostgreSQL schema in `db/schema.sql`
-- login, registration, and logout behavior in the Streamlit app
 
 Still requires manual GitHub/environment setup:
 - main branch protection rules

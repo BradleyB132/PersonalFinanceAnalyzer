@@ -1,6 +1,6 @@
 # Running PersonalFinanceAnalyzer
 
-## 🚀 Quick Start with Docker Compose (Recommended)
+## Quick Start with Docker Compose (Recommended)
 
 The easiest way to get started is using Docker Compose, which sets up PostgreSQL and the app automatically.
 
@@ -23,7 +23,7 @@ The easiest way to get started is using Docker Compose, which sets up PostgreSQL
 
 3. **Start the application:**
    ```bash
-   docker-compose up --build
+   docker compose up --build
    ```
 
 4. **Open your browser:**
@@ -34,21 +34,21 @@ The easiest way to get started is using Docker Compose, which sets up PostgreSQL
 
 ```bash
 # Start services in background
-docker-compose up -d
+docker compose up -d
 
 # View logs
-docker-compose logs -f app
+docker compose logs -f app
 
 # Stop services
-docker-compose down
+docker compose down
 ```
 
 ---
 
-## 🐍 Alternative: Running with Poetry
+## Alternative: Running with Poetry
 
 Prerequisites:
-- Python 3.9+
+- Python 3.12+
 - Poetry (https://python-poetry.org/)
 - PostgreSQL reachable via `DATABASE_URL` in `.env`
 
@@ -59,44 +59,30 @@ Quickstart using Poetry:
    - macOS / Linux: `curl -sSL https://install.python-poetry.org | python3 -`
    - Windows: follow the Windows installer instructions on the Poetry website.
 
-2. Initialize a Poetry project (if the repository does not already contain `pyproject.toml`):
-
-   ```bash
-   poetry init --no-interaction
-   ```
-
-3. Add runtime dependencies using Poetry:
-
-   ```bash
-   poetry add streamlit SQLAlchemy psycopg2-binary python-dotenv pandas
-   ```
-
-4. Install dependencies and spawn a virtual environment shell:
+2. Install dependencies:
 
    ```bash
    poetry install
-   poetry shell
    ```
 
-5. Ensure `.env` contains the `DATABASE_URL` connection string (this repo already includes a sample `.env`).
+3. Ensure `.env` contains the `DATABASE_URL` connection string (this repo already includes a sample `.env`).
 
-6. Initialize the local database (optional):
+4. Initialize the local database (optional):
 
    - Use `db/schema.sql` to create tables and `db/seed.sql` to populate sample data in your Postgres instance.
 
-7. Run the Streamlit app via Poetry:
+5. Run the Streamlit app via Poetry:
 
    ```bash
    poetry run streamlit run src/app.py
    ```
 
-E2E tests (Playwright)
------------------------
+## E2E Tests (Playwright)
 
 1. Install Playwright browsers and pytest plugin:
 
    ```bash
-   poetry add --group dev pytest-playwright
+   poetry install --with dev
    poetry run playwright install
    ```
 
@@ -106,8 +92,9 @@ E2E tests (Playwright)
    poetry run pytest tests/e2e -q
    ```
 
-Note: Running Playwright tests requires the app to be running locally (default http://localhost:8501) and accessible to the browser instance. Use `E2E_BASE_URL` environment variable to change the address if needed.
+Note: Running Playwright tests requires the app to be running locally at `http://localhost:8501` by default. Use `E2E_BASE_URL` to point tests at a different address.
 
-Notes:
+## Notes
+
 - The app uses SQLAlchemy `create_engine` to connect to the database using `DATABASE_URL`.
-- If you prefer not to use Poetry, you can still use a venv and `pip install -r requirements.txt`.
+- If you prefer not to use Poetry, you can still use a virtualenv and `pip install -r requirements.txt`.

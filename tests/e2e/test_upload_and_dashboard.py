@@ -129,4 +129,3 @@ def test_upload_credit_card_statement_and_combined_view(page: Page, base_url: st
     # The combined view should now include both the bank and card transactions
     assert page.locator('text=Uber Trip').count() > 0
     assert page.locator('text=Card Payment').count() > 0
-*** End Patch
