@@ -46,7 +46,27 @@ Quickstart using Poetry:
 E2E tests (Playwright)
 -----------------------
 
-1. Install Playwright browsers and pytest plugin:
+1. **Start the application:**
+   ```bash
+   docker-compose up -d
+   ```
+
+2. **Install Playwright browsers:**
+   ```bash
+   poetry run playwright install
+   ```
+
+3. **Run E2E tests:**
+   ```bash
+   poetry run pytest tests/e2e/ -v
+   ```
+
+4. **Run tests in headed mode (see browser):**
+   ```bash
+   poetry run pytest tests/e2e/ --headed
+   ```
+
+**Note:** E2E tests require the app to be running. They automatically create test users and clean up after each test.
 
    ```bash
    poetry add --group dev pytest-playwright
