@@ -1,5 +1,9 @@
 from __future__ import annotations
 
+# Complexity overview:
+# - Time: O(n) where n is fixture transaction rows exercised by each integration test.
+# - Space: O(n) for dataframe fixtures.
+
 from io import BytesIO
 
 import pandas as pd

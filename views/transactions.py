@@ -1,4 +1,7 @@
 """Transactions view - list, search, filter, edit category."""
+# Complexity overview:
+# - Time: O(n) for filtered transaction retrieval and table rendering.
+# - Space: O(n) for dataframe/edit-state copies.
 import streamlit as st
 import pandas as pd
 

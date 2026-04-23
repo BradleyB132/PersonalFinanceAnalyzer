@@ -2,6 +2,9 @@
 SQLAlchemy models matching the ERD:
 - User, Category, Transaction, DescriptionRule, UploadedFile
 """
+# Complexity overview:
+# - Time: O(1) class metadata declaration at import time.
+# - Space: O(m) for ORM metadata, where m is number of mapped columns/relationships.
 from datetime import datetime
 from sqlalchemy import (
     Column, Integer, String, Float, DateTime, Date, ForeignKey, Text, Boolean

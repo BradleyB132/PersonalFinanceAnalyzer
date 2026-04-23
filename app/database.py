@@ -2,6 +2,9 @@
 Database configuration module.
 Provides SQLAlchemy engine, session factory, and base declarative class.
 """
+# Complexity overview:
+# - Time: O(k) for schema compatibility checks (k ALTER statements), O(1) for session creation.
+# - Space: O(1) module/session metadata.
 import os
 import sys
 from dotenv import load_dotenv

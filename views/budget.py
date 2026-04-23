@@ -1,4 +1,7 @@
 """Budget view - monthly income setting and 50/30/20 recommendations."""
+# Complexity overview:
+# - Time: O(n) over current-month transactions and category grouping.
+# - Space: O(n) for recommendation/spending dataframes.
 import streamlit as st
 import plotly.graph_objects as go
 

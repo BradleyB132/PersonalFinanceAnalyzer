@@ -2,6 +2,9 @@
 Services layer - business logic and orchestration.
 Combines repositories, utils, and domain rules.
 """
+# Complexity overview:
+# - Time: O(n) for transaction aggregations/parsing workflows, with n as processed rows.
+# - Space: O(n) for intermediate collections used by charts/recommendations.
 from datetime import date, datetime
 from typing import Optional
 from sqlalchemy.orm import Session
@@ -25,13 +28,16 @@ def process_uploaded_statement(
     Returns: (count_saved, message)
     """
     lname = file_name.lower()
-    if lname.endswith(".csv"):
-        content = file_bytes.decode("utf-8", errors="ignore")
-        parsed = parse_csv_statement(content)
-    elif lname.endswith(".pdf"):
-        parsed = parse_pdf_statement(file_bytes)
-    else:
-        return 0, "Unsupported file format. Please upload CSV or PDF."
+    try:
+        if lname.endswith(".csv"):
+            content = file_bytes.decode("utf-8", errors="ignore")
+            parsed = parse_csv_statement(content)
+        elif lname.endswith(".pdf"):
+            parsed = parse_pdf_statement(file_bytes)
+        else:
+            return 0, "Unsupported file format. Please upload CSV or PDF."
+    except ValueError as exc:
+        return 0, str(exc)
 
     if not parsed:
         return 0, "No transactions could be parsed from the file."

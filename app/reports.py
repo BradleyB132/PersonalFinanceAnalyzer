@@ -1,6 +1,9 @@
 """
 PDF report generation using reportlab.
 """
+# Complexity overview:
+# - Time: O(n) where n is rows rendered into report tables.
+# - Space: O(n) for in-memory PDF buffer/content.
 import io
 from datetime import datetime
 from reportlab.lib import colors

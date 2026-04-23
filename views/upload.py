@@ -1,4 +1,7 @@
 """Upload view - bank and credit card statement upload."""
+# Complexity overview:
+# - Time: O(n) parsing for uploaded statement rows/lines.
+# - Space: O(n) for parsed transaction staging before DB insert.
 import streamlit as st
 
 from app.database import get_session
@@ -26,10 +29,11 @@ def render():
     st.markdown("---")
     with st.expander(":material/info: Supported file formats"):
         st.markdown("""
-        **CSV**: Standard bank CSV exports with columns like `Date`, `Description`, `Amount`.
-        Flexible header naming supported (Transaction Date, Memo, Debit/Credit, etc.).
+        **CSV**: Bank CSV files are parsed by detecting date, description,
+        and amount patterns from common transaction columns.
 
-        **PDF**: Bank statement PDFs with date, description, and amount on each transaction line.
+        **PDF**: Bank statement PDFs are parsed line-by-line by detecting date, description,
+        and amount patterns directly from text.
 
         **Auto-categorization**: Transactions are automatically categorized using rules matching
         common merchants (Walmart, Starbucks, Netflix, etc.). You can override categories anytime

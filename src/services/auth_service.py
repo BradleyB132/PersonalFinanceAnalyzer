@@ -1,5 +1,9 @@
 """Authentication helpers for registration and login."""
 
+# Complexity overview:
+# - Time: O(1) for password hashing/verification and single-user lookups.
+# - Space: O(1) per auth operation.
+
 from __future__ import annotations
 
 from dataclasses import dataclass

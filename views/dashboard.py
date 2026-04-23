@@ -1,4 +1,7 @@
 """Dashboard view - financial overview with charts."""
+# Complexity overview:
+# - Time: O(n) for transaction/category aggregation and recent activity rendering.
+# - Space: O(n) for chart dataframes and display rows.
 import streamlit as st
 import plotly.express as px
 import plotly.graph_objects as go

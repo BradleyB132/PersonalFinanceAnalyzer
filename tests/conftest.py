@@ -1,5 +1,9 @@
 from __future__ import annotations
 
+# Complexity overview:
+# - Time: O(1) fixture setup per test context, excluding SQL execution in tests.
+# - Space: O(1) fixture metadata.
+
 import sys
 from pathlib import Path
 

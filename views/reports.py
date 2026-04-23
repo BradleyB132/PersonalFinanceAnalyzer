@@ -1,4 +1,7 @@
 """Reports view - PDF report export."""
+# Complexity overview:
+# - Time: O(n) to aggregate dashboard stats and render PDF rows.
+# - Space: O(n) for report payload and in-memory PDF bytes.
 from datetime import datetime
 import streamlit as st
 

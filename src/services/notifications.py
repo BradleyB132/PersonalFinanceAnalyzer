@@ -1,5 +1,9 @@
 """Notification helpers for account confirmation emails."""
 
+# Complexity overview:
+# - Time: O(1) for SMTP setup/send per email (network latency dominant).
+# - Space: O(1) for message assembly.
+
 from __future__ import annotations
 
 from dataclasses import dataclass

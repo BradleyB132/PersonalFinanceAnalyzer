@@ -2,6 +2,9 @@
 Repository layer - data access operations.
 Each function receives a SQLAlchemy session.
 """
+# Complexity overview:
+# - Time: Mostly O(n) for query result sizes, O(1) for single-row CRUD operations.
+# - Space: O(n) for materialized query results.
 from datetime import date
 from typing import Optional
 from sqlalchemy.orm import Session

@@ -1,5 +1,9 @@
 """Finance and transaction service helpers."""
 
+# Complexity overview:
+# - Time: O(n) for import/search/report aggregations over transaction rows.
+# - Space: O(n) for dataframe/query result materialization.
+
 from __future__ import annotations
 
 from dataclasses import dataclass

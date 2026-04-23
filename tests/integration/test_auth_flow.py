@@ -1,5 +1,9 @@
 from services.auth_service import authenticate_user, register_user
 
+# Complexity overview:
+# - Time: O(1) assertions with small fixture datasets.
+# - Space: O(1).
+
 
 def test_register_and_login_flow(auth_engine) -> None:
     registration = register_user(auth_engine, "user@example.com", "Password123!")

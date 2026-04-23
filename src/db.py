@@ -1,5 +1,6 @@
-"""Database helper module for the Streamlit application."""
-
+# Complexity overview:
+# - Time: O(n) for query result materialization, O(1) for engine retrieval.
+# - Space: O(n) for returned row dictionaries.
 from functools import lru_cache
 import os
 

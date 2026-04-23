@@ -2,6 +2,9 @@
 Authentication module.
 Handles password hashing, user creation, login, session management.
 """
+# Complexity overview:
+# - Time: O(1) per hash/verify, plus O(1) indexed user lookup per auth call.
+# - Space: O(1) per request.
 import bcrypt
 import streamlit as st
 from sqlalchemy.orm import Session

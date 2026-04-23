@@ -4,6 +4,9 @@ Utility functions for:
 - Default categories and rules seeding
 - Auto-categorization logic
 """
+# Complexity overview:
+# - Time: CSV/PDF parsing is O(n) over rows/lines; rule matching is O(r) per transaction.
+# - Space: O(n) for parsed transaction collections.
 import io
 import csv
 import re
@@ -13,6 +16,80 @@ from sqlalchemy.orm import Session
 import pdfplumber
 
 from app.models import Category, DescriptionRule, Transaction
+
+
+DATE_KEYS = {
+    "date",
+    "transaction date",
+    "transaction_date",
+    "posted date",
+    "posted_date",
+    "posting date",
+}
+
+DESCRIPTION_KEYS = {
+    "description",
+    "transaction description",
+    "memo",
+    "name",
+    "details",
+    "payee",
+    "merchant",
+    "narrative",
+}
+
+AMOUNT_KEYS = {
+    "amount",
+    "amount ($)",
+    "transaction amount",
+}
+
+DEBIT_KEYS = {
+    "debit",
+    "withdrawal",
+    "charge",
+}
+
+CREDIT_KEYS = {
+    "credit",
+    "deposit",
+    "payment",
+}
+
+
+def _norm_header(value: str) -> str:
+    return str(value).strip().lower().replace("_", " ")
+
+
+def _first_value(row: dict[str, str], keys: set[str]) -> str:
+    for key in keys:
+        value = row.get(key)
+        if value is not None and str(value).strip() != "":
+            return str(value).strip()
+    return ""
+
+
+def _parse_amount(value: str) -> Optional[float]:
+    if value is None:
+        return None
+    text = str(value).strip()
+    if not text:
+        return None
+
+    negative = False
+    if text.startswith("(") and text.endswith(")"):
+        negative = True
+
+    cleaned = re.sub(r"[^\d.\-]", "", text)
+    if cleaned in {"", "-", ".", "-."}:
+        return None
+
+    try:
+        amount = float(cleaned)
+    except ValueError:
+        return None
+
+    return -abs(amount) if negative else amount
 
 
 DEFAULT_CATEGORIES = [
@@ -106,32 +183,50 @@ def parse_date(date_str: str) -> Optional[date]:
 def parse_csv_statement(content: str) -> list[dict]:
     """Parse CSV content into a list of transaction dicts."""
     transactions = []
-    try:
-        reader = csv.DictReader(io.StringIO(content))
-        for row in reader:
-            # Flexible column naming
-            date_val = (row.get('Date') or row.get('date')
-                        or row.get('Transaction Date') or row.get('Posted Date') or '')
-            desc_val = (row.get('Description') or row.get('description')
-                        or row.get('Memo') or row.get('Name') or '')
-            amount_val = (row.get('Amount') or row.get('amount')
-                          or row.get('Debit') or row.get('Credit') or '0')
+    reader = csv.DictReader(io.StringIO(content))
 
-            amount_str = re.sub(r'[^\d.\-]', '', str(amount_val))
-            try:
-                amount = float(amount_str) if amount_str else 0.0
-            except ValueError:
-                amount = 0.0
+    raw_headers = reader.fieldnames or []
+    normalized_headers = {_norm_header(header) for header in raw_headers if header}
+    supported_headers = (
+        DATE_KEYS
+        | DESCRIPTION_KEYS
+        | AMOUNT_KEYS
+        | DEBIT_KEYS
+        | CREDIT_KEYS
+    )
+    if normalized_headers and normalized_headers.isdisjoint(supported_headers):
+        raise ValueError(
+            "Could not recognize CSV columns. Include date + description + amount, "
+            "or use debit/credit columns with a date and description."
+        )
 
-            parsed_date = parse_date(date_val)
-            if desc_val and parsed_date:
-                transactions.append({
-                    "description": desc_val.strip(),
-                    "amount": amount,
-                    "transaction_date": parsed_date,
-                })
-    except Exception as e:
-        print(f"CSV parse error: {e}")
+    for raw_row in reader:
+        normalized_row = {
+            _norm_header(key): ("" if value is None else str(value).strip())
+            for key, value in raw_row.items()
+            if key is not None
+        }
+
+        date_val = _first_value(normalized_row, DATE_KEYS)
+        desc_val = _first_value(normalized_row, DESCRIPTION_KEYS)
+
+        amount_val = _first_value(normalized_row, AMOUNT_KEYS)
+        amount = _parse_amount(amount_val)
+
+        if amount is None:
+            debit = _parse_amount(_first_value(normalized_row, DEBIT_KEYS)) or 0.0
+            credit = _parse_amount(_first_value(normalized_row, CREDIT_KEYS)) or 0.0
+            if debit != 0.0 or credit != 0.0:
+                amount = credit - abs(debit)
+
+        parsed_date = parse_date(date_val)
+        if desc_val and parsed_date and amount is not None:
+            transactions.append({
+                "description": desc_val,
+                "amount": amount,
+                "transaction_date": parsed_date,
+            })
+
     return transactions
 
 

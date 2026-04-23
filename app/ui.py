@@ -1,6 +1,9 @@
 """
 Shared UI components and styling for all pages.
 """
+# Complexity overview:
+# - Time: O(1) helper calls, excluding browser rendering performed by Streamlit.
+# - Space: O(1) helper-local state.
 import streamlit as st
 
 

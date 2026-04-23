@@ -2,6 +2,9 @@
 Personal Finance Analyzer - Main Streamlit Application
 Entry point with authentication and navigation.
 """
+# Complexity overview:
+# - Time: O(1) routing/auth checks per request, excluding downstream DB/page operations.
+# - Space: O(1) framework state here, excluding session/cache and page data.
 import os
 import sys
 import streamlit as st
