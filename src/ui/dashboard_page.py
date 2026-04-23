@@ -29,6 +29,10 @@ from services.preferences_service import (
     get_user_preferences,
     save_user_preferences,
 )
+from services.validation_service import (
+    validate_search_filters,
+    validate_uploaded_file,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -596,6 +600,11 @@ def _render_dashboard_overview(engine, user_id: int) -> None:
 
 
 def _process_upload(engine, user_id: int, file_type: str, uploaded_file) -> None:
+    is_valid, validation_message = validate_uploaded_file(uploaded_file)
+    if not is_valid:
+        st.error(validation_message)
+        return
+
     try:
         result = import_statement_file(
             engine=engine,
@@ -747,6 +756,18 @@ def _render_search_section(engine, user_id: int) -> None:
         submitted = st.form_submit_button("Apply filters", type="primary")
 
     if submitted:
+        min_amount_filter = min_amount if min_amount > 0 else None
+        max_amount_filter = max_amount if max_amount > 0 else None
+        is_valid, validation_message = validate_search_filters(
+            start_date if isinstance(start_date, date) else None,
+            end_date if isinstance(end_date, date) else None,
+            min_amount_filter,
+            max_amount_filter,
+        )
+        if not is_valid:
+            st.error(validation_message)
+            return
+
         results = search_transactions(
             engine=engine,
             user_id=user_id,
@@ -756,8 +777,8 @@ def _render_search_section(engine, user_id: int) -> None:
             category_id=None
             if category_choice == "All"
             else category_lookup[category_choice],
-            min_amount=min_amount if min_amount > 0 else None,
-            max_amount=max_amount if max_amount > 0 else None,
+            min_amount=min_amount_filter,
+            max_amount=max_amount_filter,
         )
         if results.empty:
             st.info("No results match your search.")

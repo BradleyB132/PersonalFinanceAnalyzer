@@ -9,6 +9,11 @@ import streamlit as st
 from services.auth_service import authenticate_user, register_user
 from services.auth_service import get_user_by_email
 from services.notifications import send_confirmation_email
+from services.validation_service import (
+    MIN_PASSWORD_LENGTH,
+    validate_email,
+    validate_password,
+)
 from ui.dashboard_page import render_dashboard_page
 
 logger = logging.getLogger(__name__)
@@ -311,6 +316,13 @@ def render_login_form(engine) -> None:
     )
 
     if submitted:
+        if not validate_email(email):
+            st.error("Enter a valid email address.")
+            return
+        if not password:
+            st.error("Password is required.")
+            return
+
         result = authenticate_user(engine, email, password)
         if result.success and result.user is not None:
             st.session_state.authenticated_user = result.user
@@ -347,6 +359,14 @@ def render_register_form(engine) -> None:
     )
 
     if submitted:
+        if not validate_email(email):
+            st.error("Enter a valid email address.")
+            return
+        if not validate_password(password):
+            st.error(
+                f"Password must be at least {MIN_PASSWORD_LENGTH} characters long."
+            )
+            return
         if password != confirm_password:
             st.error("Passwords do not match.")
             return
