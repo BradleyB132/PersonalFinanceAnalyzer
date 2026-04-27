@@ -1,3 +1,10 @@
+"""Central logging configuration used by the application.
+
+This module configures a console handler and a rotating file handler and
+applies a consistent formatter. Importing this module has the side effect
+of initializing the root logger for the process.
+"""
+
 import logging
 from logging.handlers import RotatingFileHandler
 

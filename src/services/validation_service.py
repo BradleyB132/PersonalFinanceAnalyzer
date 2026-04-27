@@ -10,6 +10,11 @@ MAX_UPLOAD_SIZE_BYTES = 5 * 1024 * 1024
 
 
 def validate_email(email: str) -> bool:
+    """Return True when `email` looks like a valid email address.
+
+    This is a lightweight syntactic check based on a simple regex and is
+    intended for UI-level validation only (not authoritative verification).
+    """
     if not isinstance(email, str):
         return False
     normalized = email.strip().lower()
@@ -17,12 +22,18 @@ def validate_email(email: str) -> bool:
 
 
 def validate_password(password: str) -> bool:
+    """Validate password minimum length required for account creation."""
     if not isinstance(password, str):
         return False
     return len(password or "") >= MIN_PASSWORD_LENGTH
 
 
 def validate_uploaded_file(uploaded_file: Any) -> Tuple[bool, str]:
+    """Validate a Streamlit uploaded file object for CSV upload.
+
+    Returns a tuple (is_valid, message). When `is_valid` is False the
+    message contains a user-facing error description.
+    """
     if uploaded_file is None:
         return False, "No file selected. Please choose a CSV file to upload."
 
@@ -43,6 +54,10 @@ def validate_search_filters(
     min_amount: float | None,
     max_amount: float | None,
 ) -> Tuple[bool, str]:
+    """Validate search filter combinations for logical consistency.
+
+    Ensures date ranges and amount ranges are ordered correctly.
+    """
     if start_date and end_date and start_date > end_date:
         return False, "Start date must be before or equal to end date."
     if min_amount is not None and max_amount is not None and min_amount > max_amount:

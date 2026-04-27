@@ -33,6 +33,11 @@ if os.getenv("SENTRY_VALIDATE") == "1":
 
 
 def get_database_url() -> str:
+    """Return the DATABASE_URL from environment or raise RuntimeError.
+
+    The environment variable is required for database engine creation and
+    is validated early to surface misconfiguration to application startup.
+    """
     database_url = os.getenv("DATABASE_URL")
     if not database_url:
         raise RuntimeError("DATABASE_URL missing in environment")
@@ -41,14 +46,23 @@ def get_database_url() -> str:
 
 @lru_cache(maxsize=1)
 def get_engine():
+    """Return a cached SQLAlchemy engine instance.
+
+    This function is decorated with `lru_cache` to ensure a single engine
+    is reused across the application process.
+    """
     engine = create_engine(get_database_url(), future=True)
     logger.debug("Created SQLAlchemy engine for %s", get_database_url())
     return engine
 
 
 def execute_query(query, params=None, engine=None):
-    """Execute a raw SQL query and return rows as dictionaries."""
+    """Execute a read-only SQL query and return a list of row mappings.
 
+    Uses a connection from `get_engine()` unless an explicit engine is
+    provided. Returns a list of dictionaries for easy conversion to pandas
+    DataFrames.
+    """
     active_engine = engine or get_engine()
     with active_engine.connect() as conn:
         result = conn.execute(text(query), params or {})
@@ -57,8 +71,11 @@ def execute_query(query, params=None, engine=None):
 
 
 def fetch_one(query, params=None, engine=None):
-    """Execute a query and return the first row as a dictionary or None."""
+    """Execute a query and return the first row as a dict or None.
 
+    This helper is convenient for single-row lookups such as fetching users
+    or categories by unique keys.
+    """
     active_engine = engine or get_engine()
     with active_engine.connect() as conn:
         result = conn.execute(text(query), params or {})
@@ -67,8 +84,11 @@ def fetch_one(query, params=None, engine=None):
 
 
 def execute_write(query, params=None, engine=None):
-    """Execute a data-changing query and commit it."""
+    """Execute a data-changing statement and return the result proxy.
 
+    The function uses a transactional connection so DDL/DML are committed
+    automatically when the context manager exits successfully.
+    """
     active_engine = engine or get_engine()
     with active_engine.begin() as conn:
         result = conn.execute(text(query), params or {})

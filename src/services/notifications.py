@@ -27,6 +27,11 @@ class EmailDeliveryResult:
 def send_confirmation_email(
     recipient_email: str, confirmation_message: str
 ) -> EmailDeliveryResult:
+    """Send a confirmation email or log a preview when SMTP is not set.
+
+    Returns an EmailDeliveryResult indicating whether the message was sent
+    or only previewed in logs.
+    """
     subject = "PersonalFinanceAnalyzer account confirmation"
     body = (
         f"Subject: {subject}\n\n"

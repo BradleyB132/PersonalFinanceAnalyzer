@@ -23,6 +23,11 @@ st.set_page_config(
 
 
 def get_db_engine():
+    """Return a configured SQLAlchemy engine or stop the Streamlit app on error.
+
+    This helper wraps `get_engine()` and surfaces configuration issues to the
+    Streamlit UI while also logging the exception for diagnostics.
+    """
     try:
         return get_engine()
     except RuntimeError as exc:
