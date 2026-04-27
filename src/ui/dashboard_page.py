@@ -701,7 +701,6 @@ def _render_transactions_section(engine, user_id: int) -> None:
     st.write("Review transactions and update misclassified categories.")
 
     transactions = get_transactions(engine, user_id)
-    categories = get_available_categories(engine, user_id)
 
     if transactions.empty:
         _render_empty_dashboard_prompt()
@@ -727,7 +726,9 @@ def _render_transactions_section(engine, user_id: int) -> None:
         st.error("Transaction ID must be a whole number.")
         return
 
-    selected_transaction = get_transaction_by_id(engine, user_id, selected_transaction_id)
+    selected_transaction = get_transaction_by_id(
+        engine, user_id, selected_transaction_id
+    )
     if selected_transaction is None:
         st.error("Could not load the selected transaction. Ensure the ID exists.")
         return
@@ -947,11 +948,15 @@ def _render_budgeting_section(engine, user_id: int) -> None:
 
     total_recommended = float(recommendations["recommended_budget"].sum())
     total_spend = float(recommendations["actual_spend"].sum())
+    variance = total_recommended - total_spend
     col1, col2, col3 = st.columns(3)
     col1.metric("Recommended total", _fmt_currency(total_recommended))
     col2.metric("Current spend", _fmt_currency(total_spend))
     col3.metric(
-        "Unallocated", _fmt_currency(max(monthly_income - total_recommended, 0.0))
+        "Under / Over budget",
+        _fmt_currency(abs(variance)),
+        delta=f"{'under' if variance >= 0 else 'over'} budget",
+        delta_color="normal" if variance >= 0 else "inverse",
     )
 
     overspent = recommendations[recommendations["overspent"]]
@@ -970,9 +975,9 @@ def _render_budgeting_section(engine, user_id: int) -> None:
         var_name="series",
         value_name="amount",
     )
-    viz_melted["amount"] = pd.to_numeric(
-        viz_melted["amount"], errors="coerce"
-    ).fillna(0.0)
+    viz_melted["amount"] = pd.to_numeric(viz_melted["amount"], errors="coerce").fillna(
+        0.0
+    )
     bar_colors = ["#fb7185", "#44d2ff"]
     budget_chart = (
         alt.Chart(viz_melted)
