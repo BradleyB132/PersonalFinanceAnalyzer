@@ -962,8 +962,10 @@ def _render_budgeting_section(engine, user_id: int) -> None:
         )
 
     theme_mode = _resolve_theme_mode(engine)
-    left_col, right_col = st.columns([1.2, 1], gap="large")
-    with left_col:
+    # Expand the recommended vs current chart to use the full width and
+    # remove the supplementary budget-usage donut to focus the view on the
+    # category comparison visualization.
+    with st.container():
         viz_frame = recommendations[
             ["category", "actual_spend", "recommended_budget"]
         ].copy()
@@ -977,6 +979,8 @@ def _render_budgeting_section(engine, user_id: int) -> None:
             viz_melted["amount"], errors="coerce"
         ).fillna(0.0)
         bar_colors = ["#fb7185", "#44d2ff"]
+        # Increase chart height so the expanded view shows more categories
+        # and improves readability on wide displays.
         budget_chart = (
             alt.Chart(viz_melted)
             .mark_bar(cornerRadiusTopLeft=4, cornerRadiusTopRight=4)
@@ -993,30 +997,10 @@ def _render_budgeting_section(engine, user_id: int) -> None:
                     alt.Tooltip("amount:Q", format=",.2f"),
                 ],
             )
-            .properties(height=320)
+            .properties(height=520)
         )
         st.subheader("Recommended vs Current by Category")
         st.altair_chart(budget_chart, use_container_width=True)
-
-    with right_col:
-        budget_split = pd.DataFrame(
-            [
-                {"category": "Budgeted", "amount": max(total_recommended, 0.0)},
-                {
-                    "category": "Remaining",
-                    "amount": max(monthly_income - total_recommended, 0.0),
-                },
-            ]
-        )
-        st.subheader("Budget Usage")
-        _render_donut(
-            budget_split,
-            "category",
-            "amount",
-            "Budget",
-            theme_mode,
-            chart_height=360,
-        )
 
     st.dataframe(recommendations, use_container_width=True)
 
