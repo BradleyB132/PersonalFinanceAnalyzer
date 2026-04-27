@@ -1001,10 +1001,10 @@ def _render_budgeting_section(engine, user_id: int) -> None:
     with right_col:
         budget_split = pd.DataFrame(
             [
-                {"category": "Budgeted", "amount": max(total_recommended, 0.0)},
+                {"category": "Spent", "amount": max(total_spend, 0.0)},
                 {
-                    "category": "Remaining",
-                    "amount": max(monthly_income - total_recommended, 0.0),
+                    "category": "Unspent",
+                    "amount": max(total_recommended - total_spend, 0.0),
                 },
             ]
         )
