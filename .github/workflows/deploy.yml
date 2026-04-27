@@ -49,6 +49,9 @@ jobs:
 
       - name: Check health endpoint
         run: |
-          curl -f https://${{ secrets.RENDER_APP_URL }}/health || exit 1
-        retry-times: 3
-        retry-delay: 10
+          for i in 1 2 3; do
+            curl -f https://${{ secrets.RENDER_APP_URL }}/health && exit 0
+            echo "Attempt $i failed, retrying in 10s..."
+            sleep 10
+          done
+          exit 1
