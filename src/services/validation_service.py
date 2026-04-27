@@ -43,7 +43,10 @@ def validate_uploaded_file(uploaded_file: Any) -> Tuple[bool, str]:
 
     file_size = getattr(uploaded_file, "size", None)
     if isinstance(file_size, int) and file_size > MAX_UPLOAD_SIZE_BYTES:
-        return False, "Uploaded file is too large. Please upload a file smaller than 5 MB."
+        return (
+            False,
+            "Uploaded file is too large. Please upload a file smaller than 5 MB.",
+        )
 
     return True, ""
 

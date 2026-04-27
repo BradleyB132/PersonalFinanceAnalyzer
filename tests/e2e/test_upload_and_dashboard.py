@@ -58,7 +58,7 @@ def _login(page: Page, base_url: str, email: str, password: str) -> None:
     page.click('button[type="submit"]')
     time.sleep(2.0)
 
-    assert page.locator('text=Personal Finance Command Center').count() > 0
+    assert page.locator("text=Personal Finance Command Center").count() > 0
 
 
 def _upload_csv(
@@ -67,7 +67,7 @@ def _upload_csv(
     csv_path: Path,
     expected_texts: list[str] | None = None,
 ) -> None:
-    page.click(f'text={nav_label}')
+    page.click(f"text={nav_label}")
     time.sleep(0.5)
 
     upload = page.locator('input[type="file"]')
@@ -75,7 +75,7 @@ def _upload_csv(
     upload.set_input_files(str(csv_path))
     time.sleep(0.5)
 
-    process_button = page.locator('text=Process Upload')
+    process_button = page.locator("text=Process Upload")
     assert process_button.count() > 0, "Process Upload button not found"
     process_button.click()
     time.sleep(2.0)
@@ -116,11 +116,17 @@ def test_upload_bank_statement_and_view_dashboard(
     )
 
     # Verify dashboard shows the uploaded transactions
-    assert page.locator('text=Whole Foods Market').count() > 0, "Transaction not found in dashboard"
-    assert page.locator('text=Train Ticket').count() > 0, "Transaction not found in dashboard"
+    assert page.locator("text=Whole Foods Market").count() > 0, (
+        "Transaction not found in dashboard"
+    )
+    assert page.locator("text=Train Ticket").count() > 0, (
+        "Transaction not found in dashboard"
+    )
 
     # Verify dashboard metrics updated
-    assert page.locator('text=Transactions').count() > 0, "Transaction count not updated"
+    assert page.locator("text=Transactions").count() > 0, (
+        "Transaction count not updated"
+    )
 
 
 def test_upload_credit_card_statement_and_combined_view(
@@ -134,8 +140,18 @@ def test_upload_credit_card_statement_and_combined_view(
     _write_fixture_csv(
         csv_file,
         [
-            {"posted date": "2024-02-01", "merchant": "Uber Trip", "debit": "27.45", "credit": "0"},
-            {"posted date": "2024-02-02", "merchant": "Card Payment", "debit": "0", "credit": "150.00"},
+            {
+                "posted date": "2024-02-01",
+                "merchant": "Uber Trip",
+                "debit": "27.45",
+                "credit": "0",
+            },
+            {
+                "posted date": "2024-02-02",
+                "merchant": "Card Payment",
+                "debit": "0",
+                "credit": "150.00",
+            },
         ],
     )
 
@@ -158,8 +174,12 @@ def test_upload_credit_card_statement_and_combined_view(
     )
 
     # Verify both bank and card transactions are visible
-    assert page.locator('text=Uber Trip').count() > 0, "Credit card transaction not found"
-    assert page.locator('text=Card Payment').count() > 0, "Credit card transaction not found"
+    assert page.locator("text=Uber Trip").count() > 0, (
+        "Credit card transaction not found"
+    )
+    assert page.locator("text=Card Payment").count() > 0, (
+        "Credit card transaction not found"
+    )
 
 
 def test_dashboard_overview_display(page: Page, base_url: str, e2e_test_user: dict):
@@ -167,14 +187,14 @@ def test_dashboard_overview_display(page: Page, base_url: str, e2e_test_user: di
     _login(page, base_url, e2e_test_user["email"], e2e_test_user["password"])
 
     # Should show key metrics cards
-    assert page.locator('text=Transactions').count() > 0
-    assert page.locator('text=Categories').count() > 0
-    assert page.locator('text=Total Flow').count() > 0
+    assert page.locator("text=Transactions").count() > 0
+    assert page.locator("text=Categories").count() > 0
+    assert page.locator("text=Total Flow").count() > 0
 
     # Should show chart sections
-    assert page.locator('text=Income vs Expense').count() > 0
-    assert page.locator('text=Monthly Spend Trend').count() > 0
-    assert page.locator('text=Category Mix').count() > 0
+    assert page.locator("text=Income vs Expense").count() > 0
+    assert page.locator("text=Monthly Spend Trend").count() > 0
+    assert page.locator("text=Category Mix").count() > 0
 
 
 def test_search_and_filter_functionality(
@@ -194,17 +214,17 @@ def test_search_and_filter_functionality(
     _upload_csv(page, "Upload Bank", csv_file)
 
     # Navigate to Search section
-    page.click('text=Search')
+    page.click("text=Search")
     time.sleep(0.5)
 
     # Should show search form
-    assert page.locator('text=Find transactions by keyword').count() > 0
+    assert page.locator("text=Find transactions by keyword").count() > 0
     assert page.locator('input[placeholder="Walmart, Uber, Netflix"]').count() > 0
 
-    page.fill('input[placeholder="Walmart, Uber, Netflix"]', 'Uber')
-    page.click('text=Apply filters')
+    page.fill('input[placeholder="Walmart, Uber, Netflix"]', "Uber")
+    page.click("text=Apply filters")
     time.sleep(1.0)
-    assert page.locator('text=Uber Trip').count() > 0
+    assert page.locator("text=Uber Trip").count() > 0
 
 
 def test_reports_export_functionality(
@@ -221,12 +241,12 @@ def test_reports_export_functionality(
     _upload_csv(page, "Upload Bank", csv_file)
 
     # Navigate to Reports section
-    page.click('text=Reports')
+    page.click("text=Reports")
     time.sleep(0.5)
 
     # Should show export buttons
-    assert page.locator('text=Download CSV report').count() > 0
-    assert page.locator('text=Download PDF snapshot').count() > 0
+    assert page.locator("text=Download CSV report").count() > 0
+    assert page.locator("text=Download PDF snapshot").count() > 0
 
 
 def test_budget_planner_interface(page: Page, base_url: str, e2e_test_user: dict):
@@ -234,13 +254,13 @@ def test_budget_planner_interface(page: Page, base_url: str, e2e_test_user: dict
     _login(page, base_url, e2e_test_user["email"], e2e_test_user["password"])
 
     # Navigate to Budgeting section
-    page.click('text=Budgeting')
+    page.click("text=Budgeting")
     time.sleep(0.5)
 
     # Should show budget planner interface
-    assert page.locator('text=Budget Planner').count() > 0
-    assert page.locator('text=Monthly income').count() > 0
-    assert page.locator('text=Priority categories').count() > 0
+    assert page.locator("text=Budget Planner").count() > 0
+    assert page.locator("text=Monthly income").count() > 0
+    assert page.locator("text=Priority categories").count() > 0
 
 
 def test_error_handling_invalid_file(
@@ -252,7 +272,7 @@ def test_error_handling_invalid_file(
     invalid_csv.write_text("invalid,csv,data\n1,2,3")
 
     _login(page, base_url, e2e_test_user["email"], e2e_test_user["password"])
-    page.click('text=Upload Bank')
+    page.click("text=Upload Bank")
     time.sleep(0.5)
 
     # Try to upload invalid file
@@ -260,13 +280,13 @@ def test_error_handling_invalid_file(
     if upload.count() > 0:
         upload.set_input_files(str(invalid_csv))
         time.sleep(0.2)
-        page.click('text=Process Upload')
+        page.click("text=Process Upload")
         time.sleep(1.0)
         # Should show error message (though exact message may vary)
         error_indicators = [
-            page.locator('text=Failed to process'),
-            page.locator('text=error'),
-            page.locator('text=Error')
+            page.locator("text=Failed to process"),
+            page.locator("text=error"),
+            page.locator("text=Error"),
         ]
         # At least one error indicator should be present
         assert any(indicator.count() > 0 for indicator in error_indicators)
