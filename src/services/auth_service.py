@@ -12,6 +12,11 @@ from typing import Any, Callable
 from sqlalchemy.exc import IntegrityError
 
 from db import execute_write, fetch_one
+from services.validation_service import (
+    MIN_PASSWORD_LENGTH,
+    validate_email,
+    validate_password,
+)
 import logging
 
 logger = logging.getLogger(__name__)
@@ -31,10 +36,19 @@ class AuthResult:
 
 
 def normalize_email(email: str) -> str:
+    """Normalize an email address for storage and comparison.
+
+    Converts to lower-case and trims whitespace so lookups are consistent.
+    """
     return email.strip().lower()
 
 
 def hash_password(password: str, salt: bytes | None = None) -> str:
+    """Hash a password using PBKDF2-HMAC and return a portable string.
+
+    The returned format embeds the algorithm, iteration count, salt and
+    derived key so `verify_password` can validate candidates.
+    """
     salt_bytes = salt or secrets.token_bytes(SALT_BYTES)
     derived = hashlib.pbkdf2_hmac(
         PBKDF2_ALGORITHM,
@@ -53,6 +67,10 @@ def hash_password(password: str, salt: bytes | None = None) -> str:
 
 
 def verify_password(password: str, stored_hash: str) -> bool:
+    """Verify a password candidate against a stored hash string.
+
+    Returns True when the provided password matches the stored hash.
+    """
     try:
         algorithm, iterations, encoded_salt, encoded_hash = stored_hash.split("$", 3)
     except ValueError:
@@ -73,6 +91,10 @@ def verify_password(password: str, stored_hash: str) -> bool:
 
 
 def get_user_by_email(email: str, engine=None) -> dict[str, Any] | None:
+    """Fetch a user row by email. Email is normalized before lookup.
+
+    Returns a mapping or None if the user does not exist.
+    """
     return fetch_one(
         "SELECT id, email, password_hash, created_at FROM users WHERE email = :email",
         {"email": normalize_email(email)},
@@ -81,6 +103,7 @@ def get_user_by_email(email: str, engine=None) -> dict[str, Any] | None:
 
 
 def build_confirmation_message(email: str) -> str:
+    """Construct a friendly confirmation message used for welcome emails."""
     return (
         f"Welcome to PersonalFinanceAnalyzer, {email}! "
         "Your account has been created successfully. "
@@ -97,11 +120,19 @@ def register_user(
     password: str,
     confirmation_sender: ConfirmationSender | None = None,
 ) -> AuthResult:
+    """Register a new user with email and password.
+
+    Performs validation, ensures uniqueness, and inserts the user record.
+    Returns an `AuthResult` containing the created user on success.
+    """
     normalized_email = normalize_email(email)
-    if not normalized_email:
-        return AuthResult(False, "Email is required.")
-    if not password:
-        return AuthResult(False, "Password is required.")
+    if not validate_email(normalized_email):
+        return AuthResult(False, "Enter a valid email address.")
+    if not validate_password(password):
+        return AuthResult(
+            False,
+            f"Password must be at least {MIN_PASSWORD_LENGTH} characters long.",
+        )
 
     existing_user = get_user_by_email(normalized_email, engine=engine)
     if existing_user is not None:
@@ -155,10 +186,21 @@ def register_user(
 
 
 def authenticate_user(engine, email: str, password: str) -> AuthResult:
+    """Authenticate credentials and return an AuthResult.
+
+    Validates input format, looks up the user and verifies the password.
+    """
     normalized_email = normalize_email(email)
-    if not normalized_email or not password:
+    if not validate_email(normalized_email):
         logger.warning(
-            "authenticate_user: missing credentials", extra={"email": normalized_email}
+            "authenticate_user: invalid email format",
+            extra={"email": normalized_email},
+        )
+        return AuthResult(False, "Enter a valid email address.")
+    if not password:
+        logger.warning(
+            "authenticate_user: missing password",
+            extra={"email": normalized_email},
         )
         return AuthResult(False, "Enter both email and password.")
 

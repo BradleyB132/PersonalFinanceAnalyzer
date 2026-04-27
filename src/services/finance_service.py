@@ -58,6 +58,24 @@ class StatementImportResult:
 
 
 def _normalize_columns(frame: pd.DataFrame) -> pd.DataFrame:
+    """Normalize and alias CSV column names.
+
+    Purpose:
+        Convert incoming DataFrame column names to canonical internal names by
+        lowercasing, trimming, replacing dashes, and applying the
+        `COLUMN_ALIASES` mapping. This makes downstream parsing consistent
+        across different bank/credit card CSV formats.
+
+    Args:
+        frame: pandas DataFrame read directly from a CSV file.
+
+    Returns:
+        A DataFrame with columns renamed according to canonical names.
+
+    Complexity:
+        Time: O(C) where C is number of columns.
+        Space: O(C) additional for temporary lists; returns a shallow copy.
+    """
     renamed = frame.copy()
     renamed.columns = [
         str(column).strip().lower().replace("-", " ") for column in renamed.columns
@@ -71,6 +89,19 @@ def _normalize_columns(frame: pd.DataFrame) -> pd.DataFrame:
 
 
 def _coerce_date(value: Any) -> date:
+    """Coerce various date representations into a datetime.date.
+
+    Accepts `datetime.date`, ISO strings, or other values parseable by
+    pandas.to_datetime. Raises ValueError for invalid inputs.
+
+    Args:
+        value: date-like value or string from CSV.
+
+    Returns:
+        datetime.date instance.
+
+    Complexity: O(1) per value.
+    """
     if isinstance(value, date):
         return value
     parsed = pd.to_datetime(value, errors="coerce")
@@ -80,9 +111,26 @@ def _coerce_date(value: Any) -> date:
 
 
 def _coerce_amount(value: Any) -> float:
+    """Parse an amount value into a float.
+
+    Handles strings with currency symbols, commas, and accounting-style
+    parentheses for negatives. Also accepts numeric types.
+
+    Args:
+        value: str or numeric amount from CSV.
+
+    Returns:
+        float representation of the amount.
+
+    Raises:
+        ValueError for values that cannot be parsed.
+
+    Complexity: O(L) for string cleaning where L is string length.
+    """
     if isinstance(value, str):
         cleaned = value.strip().replace(",", "").replace("$", "")
         if cleaned.startswith("(") and cleaned.endswith(")"):
+            # Convert (123.45) -> -123.45
             cleaned = f"-{cleaned[1:-1]}"
         try:
             return float(cleaned)
@@ -96,6 +144,22 @@ def _coerce_amount(value: Any) -> float:
 
 
 def _derive_amount_from_debit_credit(frame: pd.DataFrame) -> pd.DataFrame:
+    """Derive an `amount` column from `debit` and `credit` columns.
+
+    Some statement formats split movements into `debit` (outflow) and
+    `credit` (inflow). This helper constructs `amount = credit - abs(debit)`
+    so outflows become negative values and inflows positive.
+
+    If an `amount` column already exists, the frame is returned unchanged.
+
+    Args:
+        frame: DataFrame possibly containing `debit`/`credit` or `amount`.
+
+    Returns:
+        DataFrame with an `amount` column present.
+
+    Complexity: O(N) where N is number of rows.
+    """
     derived = frame.copy()
     if "amount" in derived.columns:
         return derived
@@ -120,6 +184,23 @@ def _derive_amount_from_debit_credit(frame: pd.DataFrame) -> pd.DataFrame:
 
 
 def _statement_frame_from_bytes(file_bytes: bytes) -> pd.DataFrame:
+    """Parse uploaded CSV bytes into a validated statement DataFrame.
+
+    This function reads CSV bytes using pandas, normalizes headers, derives
+    `amount` from debit/credit columns when necessary, validates that the
+    required columns are present, and returns only the required columns.
+
+    Args:
+        file_bytes: raw bytes of the uploaded CSV file.
+
+    Returns:
+        DataFrame with columns `amount`, `description`, `transaction_date`.
+
+    Raises:
+        ValueError if required columns are missing or parsing fails.
+
+    Complexity: O(N) time and O(N) space where N is number of rows in CSV.
+    """
     frame = pd.read_csv(BytesIO(file_bytes))
     frame = _normalize_columns(frame)
     frame = _derive_amount_from_debit_credit(frame)
@@ -132,6 +213,22 @@ def _statement_frame_from_bytes(file_bytes: bytes) -> pd.DataFrame:
 
 
 def get_available_categories(engine, user_id: int) -> pd.DataFrame:
+    """Return categories visible to a user, de-duplicated by name.
+
+    Purpose:
+        Provide a list of categories to UI components. System categories have
+        `user_id IS NULL` while user overrides have `user_id = <user>`. When
+        multiple categories share the same name, prefer the user-specific one.
+
+    Args:
+        engine: SQLAlchemy engine
+        user_id: user id for which to fetch categories
+
+    Returns:
+        DataFrame of unique categories with columns `id`, `name`, `user_id`.
+
+    Complexity: O(C) where C is number of categories returned by DB.
+    """
     rows = execute_query(
         """
         SELECT id, name, user_id

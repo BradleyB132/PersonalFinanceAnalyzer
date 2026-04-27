@@ -17,7 +17,11 @@ class HealthHandler(BaseHTTPRequestHandler):
     """HTTP request handler for health check endpoint."""
 
     def do_GET(self):
-        """Handle GET requests."""
+        """Handle GET requests.
+
+        Responds to `/health` with a small JSON payload describing status and
+        timestamp. Other paths return 404.
+        """
         if self.path == "/health":
             response = {
                 "status": "healthy",
@@ -39,7 +43,11 @@ class HealthHandler(BaseHTTPRequestHandler):
 
 
 def run_health_server(port: int = 8502) -> None:
-    """Start the health check server."""
+    """Start a simple HTTP server that serves the health endpoint.
+
+    This function blocks and runs the server in the current thread. It is
+    intended to be used in a dedicated process or thread for monitoring.
+    """
     server_address = ("0.0.0.0", port)
     httpd = HTTPServer(server_address, HealthHandler)
     logger.info(f"Health check server listening on port {port}")

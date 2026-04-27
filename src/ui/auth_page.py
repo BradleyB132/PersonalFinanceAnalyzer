@@ -9,6 +9,11 @@ import streamlit as st
 from services.auth_service import authenticate_user, register_user
 from services.auth_service import get_user_by_email
 from services.notifications import send_confirmation_email
+from services.validation_service import (
+    MIN_PASSWORD_LENGTH,
+    validate_email,
+    validate_password,
+)
 from ui.dashboard_page import render_dashboard_page
 
 logger = logging.getLogger(__name__)
@@ -248,6 +253,10 @@ def inject_styles() -> None:
 
 
 def initialize_session_state() -> None:
+    """Ensure session state keys for authentication are present.
+
+    Initializes `authenticated_user` and `auth_mode` used by the auth UI.
+    """
     if "authenticated_user" not in st.session_state:
         st.session_state.authenticated_user = None
     if "auth_mode" not in st.session_state:
@@ -255,10 +264,19 @@ def initialize_session_state() -> None:
 
 
 def set_auth_mode(mode: str) -> None:
+    """Set the authentication mode displayed by the UI (e.g. 'Login' or 'Register').
+
+    The value is stored in Streamlit session state so navigation persists
+    across reruns.
+    """
     st.session_state.auth_mode = mode
 
 
 def handle_logout() -> None:
+    """Clear authentication session state and update query params.
+
+    This logs the user out for the current session and triggers a UI rerun.
+    """
     st.session_state.authenticated_user = None
     if AUTH_QUERY_KEY in st.query_params:
         del st.query_params[AUTH_QUERY_KEY]
@@ -266,6 +284,11 @@ def handle_logout() -> None:
 
 
 def _restore_auth_session(engine) -> None:
+    """Attempt to restore an authenticated session from query params.
+
+    If the `AUTH_QUERY_KEY` is present in the URL query parameters the
+    matching user will be loaded and placed into session state.
+    """
     if st.session_state.authenticated_user is not None:
         return
 
@@ -279,6 +302,11 @@ def _restore_auth_session(engine) -> None:
 
 
 def render_logged_in_view(engine) -> None:
+    """Render the dashboard view for the currently authenticated user.
+
+    This delegator calls into the dashboard module and passes a logout
+    callback so the dashboard can trigger a logout when requested.
+    """
     user = st.session_state.authenticated_user
     if user is None:
         return
@@ -311,6 +339,13 @@ def render_login_form(engine) -> None:
     )
 
     if submitted:
+        if not validate_email(email):
+            st.error("Enter a valid email address.")
+            return
+        if not password:
+            st.error("Password is required.")
+            return
+
         result = authenticate_user(engine, email, password)
         if result.success and result.user is not None:
             st.session_state.authenticated_user = result.user
@@ -347,6 +382,14 @@ def render_register_form(engine) -> None:
     )
 
     if submitted:
+        if not validate_email(email):
+            st.error("Enter a valid email address.")
+            return
+        if not validate_password(password):
+            st.error(
+                f"Password must be at least {MIN_PASSWORD_LENGTH} characters long."
+            )
+            return
         if password != confirm_password:
             st.error("Passwords do not match.")
             return

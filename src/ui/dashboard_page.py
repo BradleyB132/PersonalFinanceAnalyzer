@@ -29,6 +29,10 @@ from services.preferences_service import (
     get_user_preferences,
     save_user_preferences,
 )
+from services.validation_service import (
+    validate_search_filters,
+    validate_uploaded_file,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -67,6 +71,11 @@ NAV_DISPLAY = {
 
 
 def _resolve_theme_mode(engine) -> str:
+    """Resolve the current theme mode from session state or user preferences.
+
+    Caches the resolved value in session state for the duration of the
+    Streamlit session to avoid repeated DB calls.
+    """
     if "theme_mode" in st.session_state:
         return st.session_state.theme_mode
 
@@ -104,11 +113,13 @@ def _theme_tokens(theme_mode: str) -> dict[str, str]:
 
 
 def _inject_dashboard_styles(theme_mode: str) -> None:
+    """Inject CSS styles for the dashboard using computed theme tokens."""
     t = _theme_tokens(theme_mode)
     st.markdown(build_dashboard_styles(t), unsafe_allow_html=True)
 
 
 def initialize_dashboard_state() -> None:
+    """Ensure dashboard session state has a selected navigation section."""
     if "dashboard_section" not in st.session_state:
         st.session_state.dashboard_section = NAVIGATION_OPTIONS[0]
 
@@ -118,10 +129,15 @@ def _set_dashboard_section(section: str) -> None:
 
 
 def _fmt_currency(value: float) -> str:
+    """Format a numeric value as US-style currency for display.
+
+    This helper centralizes formatting to keep UI strings consistent.
+    """
     return f"${value:,.2f}"
 
 
 def _build_recent_activity_csv(transactions: pd.DataFrame, limit: int = 20) -> bytes:
+    """Return CSV bytes for the most recent transactions up to `limit`."""
     recent = transactions.head(limit).copy()
     recent["amount"] = pd.to_numeric(recent["amount"], errors="coerce").fillna(0.0)
     export_cols = [
@@ -138,6 +154,11 @@ def _build_recent_activity_csv(transactions: pd.DataFrame, limit: int = 20) -> b
 
 
 def _render_kpi_cards(metrics: dict[str, float]) -> None:
+    """Render compact KPI cards showing top-level metrics.
+
+    Cards are rendered into the Streamlit layout with a fixed 4-column
+    grid to present transaction and category counts, totals and averages.
+    """
     cards = [
         ("Transactions", f"{int(metrics['transaction_count'])}", "Records uploaded"),
         ("Categories", f"{int(metrics['category_count'])}", "Mapped spending buckets"),
@@ -166,6 +187,7 @@ def _render_kpi_cards(metrics: dict[str, float]) -> None:
 
 
 def _apply_chart_theme(chart: alt.Chart, theme_mode: str) -> alt.Chart:
+    """Apply consistent axis/legend styling to Altair charts."""
     axis_color = "#c7d2fe"
     legend_color = "#e2e8f0"
     grid_color = "rgba(148, 163, 184, 0.18)"
@@ -183,6 +205,7 @@ def _apply_chart_theme(chart: alt.Chart, theme_mode: str) -> alt.Chart:
 
 
 def _render_spend_trend_chart(trend_summary: pd.DataFrame, theme_mode: str) -> None:
+    """Render a combined area+line chart showing monthly spend over time."""
     if trend_summary.empty:
         st.info("No trend data is available yet.")
         return
@@ -225,6 +248,11 @@ def _render_spend_trend_chart(trend_summary: pd.DataFrame, theme_mode: str) -> N
 
 
 def _build_income_expense_series(transactions: pd.DataFrame) -> pd.DataFrame:
+    """Build a long-form series frame for income vs expense charting.
+
+    The returned frame has columns `period`, `series` and `amount` and is
+    safe for Altair plotting.
+    """
     tx = transactions.copy()
     tx["amount"] = pd.to_numeric(tx["amount"], errors="coerce").fillna(0.0)
     tx["transaction_date"] = pd.to_datetime(tx["transaction_date"], errors="coerce")
@@ -250,6 +278,7 @@ def _build_income_expense_series(transactions: pd.DataFrame) -> pd.DataFrame:
 def _render_income_vs_expense_chart(
     transactions: pd.DataFrame, theme_mode: str
 ) -> None:
+    """Render an income vs expense multi-series chart for recent months."""
     frame = _build_income_expense_series(transactions)
     if frame.empty:
         st.info("Not enough data to render income vs expense trend yet.")
@@ -326,6 +355,7 @@ def _render_donut(
     theme_mode: str,
     chart_height: int = 360,
 ) -> None:
+    """Render a donut chart for category/amount breakdown using Altair."""
     if frame.empty:
         st.info("No data is available for donut chart.")
         return
@@ -414,6 +444,11 @@ def _render_donut(
 def _render_recent_transaction_cards(
     engine, user_id: int, transactions: pd.DataFrame
 ) -> None:
+    """Render a vertical list of recent transaction cards with quick actions.
+
+    For uncategorized transactions the UI provides an inline selectbox to
+    assign a category quickly.
+    """
     recent = transactions.head(8).copy()
     recent["amount"] = pd.to_numeric(recent["amount"], errors="coerce").fillna(0.0)
     categories = get_available_categories(engine, user_id)
@@ -476,6 +511,7 @@ def _render_recent_transaction_cards(
 
 
 def _render_sidebar(user, logout_callback) -> None:
+    """Render the application sidebar including navigation and logout."""
     with st.sidebar:
         st.markdown(
             """
@@ -513,6 +549,7 @@ def _render_sidebar(user, logout_callback) -> None:
 
 
 def _render_empty_dashboard_prompt() -> None:
+    """Show a helpful prompt when there are no transactions yet."""
     st.info("No transactions are available yet. Use the upload section to add data.")
     st.button(
         "Upload data now",
@@ -596,6 +633,11 @@ def _render_dashboard_overview(engine, user_id: int) -> None:
 
 
 def _process_upload(engine, user_id: int, file_type: str, uploaded_file) -> None:
+    is_valid, validation_message = validate_uploaded_file(uploaded_file)
+    if not is_valid:
+        st.error(validation_message)
+        return
+
     try:
         result = import_statement_file(
             engine=engine,
@@ -748,6 +790,18 @@ def _render_search_section(engine, user_id: int) -> None:
         submitted = st.form_submit_button("Apply filters", type="primary")
 
     if submitted:
+        min_amount_filter = min_amount if min_amount > 0 else None
+        max_amount_filter = max_amount if max_amount > 0 else None
+        is_valid, validation_message = validate_search_filters(
+            start_date if isinstance(start_date, date) else None,
+            end_date if isinstance(end_date, date) else None,
+            min_amount_filter,
+            max_amount_filter,
+        )
+        if not is_valid:
+            st.error(validation_message)
+            return
+
         results = search_transactions(
             engine=engine,
             user_id=user_id,
@@ -757,8 +811,8 @@ def _render_search_section(engine, user_id: int) -> None:
             category_id=None
             if category_choice == "All"
             else category_lookup[category_choice],
-            min_amount=min_amount if min_amount > 0 else None,
-            max_amount=max_amount if max_amount > 0 else None,
+            min_amount=min_amount_filter,
+            max_amount=max_amount_filter,
         )
         if results.empty:
             st.info("No results match your search.")
