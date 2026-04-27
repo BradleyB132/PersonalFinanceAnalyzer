@@ -134,8 +134,18 @@ def test_upload_credit_card_statement_and_combined_view(
     _write_fixture_csv(
         csv_file,
         [
-            {"posted date": "2024-02-01", "merchant": "Uber Trip", "debit": "27.45", "credit": "0"},
-            {"posted date": "2024-02-02", "merchant": "Card Payment", "debit": "0", "credit": "150.00"},
+            {
+                "posted date": "2024-02-01",
+                "merchant": "Uber Trip",
+                "debit": "27.45",
+                "credit": "0",
+            },
+            {
+                "posted date": "2024-02-02",
+                "merchant": "Card Payment",
+                "debit": "0",
+                "credit": "150.00",
+            },
         ],
     )
 
