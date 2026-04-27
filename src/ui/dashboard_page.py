@@ -961,62 +961,39 @@ def _render_budgeting_section(engine, user_id: int) -> None:
             + ", ".join(overspent["category"].astype(str).tolist())
         )
 
-    theme_mode = _resolve_theme_mode(engine)
-    left_col, right_col = st.columns([1.2, 1], gap="large")
-    with left_col:
-        viz_frame = recommendations[
-            ["category", "actual_spend", "recommended_budget"]
-        ].copy()
-        viz_melted = viz_frame.melt(
-            id_vars=["category"],
-            value_vars=["actual_spend", "recommended_budget"],
-            var_name="series",
-            value_name="amount",
+    viz_frame = recommendations[
+        ["category", "actual_spend", "recommended_budget"]
+    ].copy()
+    viz_melted = viz_frame.melt(
+        id_vars=["category"],
+        value_vars=["actual_spend", "recommended_budget"],
+        var_name="series",
+        value_name="amount",
+    )
+    viz_melted["amount"] = pd.to_numeric(
+        viz_melted["amount"], errors="coerce"
+    ).fillna(0.0)
+    bar_colors = ["#fb7185", "#44d2ff"]
+    budget_chart = (
+        alt.Chart(viz_melted)
+        .mark_bar(cornerRadiusTopLeft=4, cornerRadiusTopRight=4)
+        .encode(
+            x=alt.X("category:N", title="Category"),
+            y=alt.Y("amount:Q", title="Amount"),
+            color=alt.Color(
+                "series:N", scale=alt.Scale(range=bar_colors), title="Series"
+            ),
+            xOffset="series:N",
+            tooltip=[
+                "category:N",
+                "series:N",
+                alt.Tooltip("amount:Q", format=",.2f"),
+            ],
         )
-        viz_melted["amount"] = pd.to_numeric(
-            viz_melted["amount"], errors="coerce"
-        ).fillna(0.0)
-        bar_colors = ["#fb7185", "#44d2ff"]
-        budget_chart = (
-            alt.Chart(viz_melted)
-            .mark_bar(cornerRadiusTopLeft=4, cornerRadiusTopRight=4)
-            .encode(
-                x=alt.X("category:N", title="Category"),
-                y=alt.Y("amount:Q", title="Amount"),
-                color=alt.Color(
-                    "series:N", scale=alt.Scale(range=bar_colors), title="Series"
-                ),
-                xOffset="series:N",
-                tooltip=[
-                    "category:N",
-                    "series:N",
-                    alt.Tooltip("amount:Q", format=",.2f"),
-                ],
-            )
-            .properties(height=320)
-        )
-        st.subheader("Recommended vs Current by Category")
-        st.altair_chart(budget_chart, use_container_width=True)
-
-    with right_col:
-        budget_split = pd.DataFrame(
-            [
-                {"category": "Budgeted", "amount": max(total_recommended, 0.0)},
-                {
-                    "category": "Remaining",
-                    "amount": max(monthly_income - total_recommended, 0.0),
-                },
-            ]
-        )
-        st.subheader("Budget Usage")
-        _render_donut(
-            budget_split,
-            "category",
-            "amount",
-            "Budget",
-            theme_mode,
-            chart_height=360,
-        )
+        .properties(height=320)
+    )
+    st.subheader("Recommended vs Current by Category")
+    st.altair_chart(budget_chart, use_container_width=True)
 
     st.dataframe(recommendations, use_container_width=True)
 
