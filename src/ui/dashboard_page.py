@@ -701,7 +701,6 @@ def _render_transactions_section(engine, user_id: int) -> None:
     st.write("Review transactions and update misclassified categories.")
 
     transactions = get_transactions(engine, user_id)
-    categories = get_available_categories(engine, user_id)
 
     if transactions.empty:
         _render_empty_dashboard_prompt()
