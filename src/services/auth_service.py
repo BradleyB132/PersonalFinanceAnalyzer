@@ -136,7 +136,10 @@ def register_user(
 
     existing_user = get_user_by_email(normalized_email, engine=engine)
     if existing_user is not None:
-        logger.info("register_user: attempt with existing email", extra={"email": normalized_email})
+        logger.info(
+            "register_user: attempt with existing email",
+            extra={"email": normalized_email},
+        )
         return AuthResult(False, "Email is already registered.")
 
     password_hash = hash_password(password)
@@ -147,15 +150,24 @@ def register_user(
             engine=engine,
         )
     except IntegrityError:
-        logger.exception("register_user: IntegrityError while inserting user", extra={"email": normalized_email})
+        logger.exception(
+            "register_user: IntegrityError while inserting user",
+            extra={"email": normalized_email},
+        )
         return AuthResult(False, "Email is already registered.")
     except Exception:
-        logger.exception("register_user: unexpected error while creating user", extra={"email": normalized_email})
+        logger.exception(
+            "register_user: unexpected error while creating user",
+            extra={"email": normalized_email},
+        )
         return AuthResult(False, "Account creation failed. Please try again.")
 
     user = get_user_by_email(normalized_email, engine=engine)
     if user is None:
-        logger.error("register_user: user not found after insert", extra={"email": normalized_email})
+        logger.error(
+            "register_user: user not found after insert",
+            extra={"email": normalized_email},
+        )
         return AuthResult(False, "Account creation failed. Please try again.")
 
     confirmation_message = build_confirmation_message(normalized_email)
@@ -194,8 +206,12 @@ def authenticate_user(engine, email: str, password: str) -> AuthResult:
 
     user = get_user_by_email(normalized_email, engine=engine)
     if user is None or not verify_password(password, user["password_hash"]):
-        logger.warning("authenticate_user: failed login", extra={"email": normalized_email})
+        logger.warning(
+            "authenticate_user: failed login", extra={"email": normalized_email}
+        )
         return AuthResult(False, "Invalid username or password.")
 
-    logger.info("authenticate_user: successful login", extra={"email": normalized_email})
+    logger.info(
+        "authenticate_user: successful login", extra={"email": normalized_email}
+    )
     return AuthResult(True, "Login successful.", user=user)

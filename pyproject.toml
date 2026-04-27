@@ -7,6 +7,7 @@ authors = [
 ]
 
 [tool.poetry]
+package-mode = false
 # Use a minimal Poetry configuration to manage dependencies. Keep package
 # metadata simple and put dependencies under the canonical Poetry keys so
 # `poetry install --with dev` works in CI. Avoid specifying `dependencies`
